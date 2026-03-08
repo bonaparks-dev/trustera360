@@ -2,18 +2,18 @@ import { Link } from 'react-router-dom'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a2e1f] via-[#0d3d2a] to-[#0a2e1f] text-white">
+    <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
           <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
-          <span className="text-xl font-bold tracking-tight">TRUSTERA</span>
+          <span className="text-xl font-bold tracking-tight text-[#0d3d2a]">TRUSTERA</span>
         </div>
         <div className="flex gap-3">
-          <Link to="/login" className="text-sm text-gray-300 hover:text-white transition-colors px-4 py-2">
+          <Link to="/login" className="text-sm text-gray-500 hover:text-gray-800 transition-colors px-4 py-2">
             Accedi
           </Link>
-          <Link to="/login" className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors">
+          <Link to="/login" className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors shadow-md shadow-green-600/20">
             Inizia Gratis
           </Link>
         </div>
@@ -21,17 +21,17 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-[#0d3d2a]">
           Ancora a stampare, firmare e scannerizzare documenti?
         </h1>
-        <p className="text-xl sm:text-2xl text-gray-300 mb-4">
-          Con <strong className="text-green-400">Trustera</strong> firmi e invii tutto <strong>in meno di un minuto.</strong>
+        <p className="text-xl sm:text-2xl text-gray-600 mb-4">
+          Con <strong className="text-green-600">Trustera</strong> firmi e invii tutto <strong className="text-gray-900">in meno di un minuto.</strong>
         </p>
-        <p className="text-lg text-gray-400 mb-10">
-          Ogni documento ha <strong className="text-white">Audit Trail certificato</strong>: data, ora, dispositivo e firma registrati.
+        <p className="text-lg text-gray-500 mb-10">
+          Ogni documento ha <strong className="text-gray-800">Audit Trail certificato</strong>: data, ora, dispositivo e firma registrati.
           <br />Cosi nessuno puo modificare il documento dopo la firma.
         </p>
-        <Link to="/login" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-xl text-lg transition-colors shadow-lg shadow-green-900/30">
+        <Link to="/login" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-xl text-lg transition-colors shadow-lg shadow-green-600/30">
           Inizia Gratis
         </Link>
       </section>
@@ -45,9 +45,9 @@ export default function LandingPage() {
             { title: 'Protetta.', desc: 'Hash SHA-256, documento non modificabile dopo la firma.' },
             { title: 'Gratuita.', desc: 'Piano Free senza limiti, sostenuto da offerte partner.' },
           ].map(f => (
-            <div key={f.title} className="bg-white/5 border border-white/10 rounded-xl p-6 backdrop-blur-sm">
-              <h3 className="text-lg font-bold text-green-400 mb-2">{f.title}</h3>
-              <p className="text-gray-400 text-sm">{f.desc}</p>
+            <div key={f.title} className="bg-white border border-gray-200 rounded-xl p-6 shadow-md shadow-green-600/5 hover:shadow-lg hover:shadow-green-600/10 transition-shadow">
+              <h3 className="text-lg font-bold text-green-600 mb-2">{f.title}</h3>
+              <p className="text-gray-500 text-sm">{f.desc}</p>
             </div>
           ))}
         </div>
@@ -55,40 +55,40 @@ export default function LandingPage() {
 
       {/* Pricing */}
       <section className="max-w-4xl mx-auto px-6 py-16">
-        <h2 className="text-3xl font-bold text-center mb-10">Scegli il tuo piano</h2>
+        <h2 className="text-3xl font-bold text-center mb-10 text-[#0d3d2a]">Scegli il tuo piano</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-8">
-            <h3 className="text-2xl font-bold text-green-400 mb-2">Free</h3>
-            <p className="text-3xl font-bold mb-4">0 / mese</p>
-            <p className="text-gray-400 mb-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-md shadow-green-600/5">
+            <h3 className="text-2xl font-bold text-green-600 mb-2">Free</h3>
+            <p className="text-3xl font-bold text-gray-900 mb-4">0 / mese</p>
+            <p className="text-gray-500 mb-6">
               Piattaforma senza costo, sostenuta da iniziative promozionali e vantaggi commerciali per gli utenti che prestano consenso.
             </p>
-            <ul className="text-sm text-gray-300 space-y-2 mb-8">
+            <ul className="text-sm text-gray-600 space-y-2 mb-8">
               <li>Documenti illimitati</li>
               <li>Firma OTP via WhatsApp/Email</li>
               <li>Audit Trail certificato</li>
               <li>Dashboard documenti</li>
             </ul>
-            <Link to="/login" className="block text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors">
+            <Link to="/login" className="block text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors shadow-md shadow-green-600/20">
               Inizia Gratis
             </Link>
           </div>
-          <div className="bg-white/5 border border-green-500/30 rounded-xl p-8 relative">
+          <div className="bg-white border-2 border-green-500/40 rounded-xl p-8 relative shadow-lg shadow-green-600/10">
             <div className="absolute -top-3 right-6 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full">
               PRO
             </div>
-            <h3 className="text-2xl font-bold text-green-400 mb-2">Premium</h3>
-            <p className="text-3xl font-bold mb-4">Prossimamente</p>
-            <p className="text-gray-400 mb-6">
+            <h3 className="text-2xl font-bold text-green-600 mb-2">Premium</h3>
+            <p className="text-3xl font-bold text-gray-900 mb-4">Prossimamente</p>
+            <p className="text-gray-500 mb-6">
               Esperienza dedicata, senza utilizzo dei contatti per finalita promozionali di terzi.
             </p>
-            <ul className="text-sm text-gray-300 space-y-2 mb-8">
+            <ul className="text-sm text-gray-600 space-y-2 mb-8">
               <li>Tutto del Free</li>
               <li>Nessuna promozione partner</li>
               <li>Branding personalizzato</li>
               <li>API access</li>
             </ul>
-            <button disabled className="block w-full text-center bg-gray-700 text-gray-400 font-bold py-3 rounded-lg cursor-not-allowed">
+            <button disabled className="block w-full text-center bg-gray-200 text-gray-400 font-bold py-3 rounded-lg cursor-not-allowed">
               Prossimamente
             </button>
           </div>
@@ -96,11 +96,11 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 mt-16">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+      <footer className="border-t border-gray-200 mt-16">
+        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
           <span>Trustera - Infrastructure for Digital Trust</span>
           <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacy & GDPR</Link>
+            <Link to="/privacy" className="hover:text-green-600 transition-colors">Privacy & GDPR</Link>
           </div>
         </div>
       </footer>

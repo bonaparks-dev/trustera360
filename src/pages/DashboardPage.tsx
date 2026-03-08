@@ -129,7 +129,7 @@ export default function DashboardPage({ session }: { session: Session }) {
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/trustera-logo.png" alt="Trustera" className="h-8" />
+            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-8" />
             <span className="text-lg font-bold text-gray-800">TRUSTERA</span>
           </div>
           <div className="flex items-center gap-4">

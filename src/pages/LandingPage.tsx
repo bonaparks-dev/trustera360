@@ -6,7 +6,7 @@ export default function LandingPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-3">
-          <img src="/trustera-logo.png" alt="Trustera" className="h-10" />
+          <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
           <span className="text-xl font-bold tracking-tight">TRUSTERA</span>
         </div>
         <div className="flex gap-3">

@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/">
-            <img src="/trustera-logo.png" alt="Trustera" className="h-12 mx-auto mb-3" />
+            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 mx-auto mb-3" />
           </Link>
           <h1 className="text-2xl font-bold text-gray-800">
             {isSignUp ? 'Crea Account' : 'Accedi'}

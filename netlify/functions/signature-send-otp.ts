@@ -1,5 +1,6 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
 
 const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
@@ -8,6 +9,7 @@ const supabase = createClient(
 
 const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
 const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
+const resend = new Resend(process.env.RESEND_API_KEY!)
 
 const OTP_EXPIRY_MINUTES = 10
 const MAX_OTP_ATTEMPTS = 5
@@ -123,38 +125,71 @@ export const handler: Handler = async (event) => {
 
         console.log(`[signature-send-otp] Final customerPhone="${customerPhone}", GREEN_API_INSTANCE_ID=${GREEN_API_INSTANCE_ID ? 'set' : 'NOT SET'}, GREEN_API_TOKEN=${GREEN_API_TOKEN ? 'set' : 'NOT SET'}`)
 
-        const channel: 'whatsapp' = 'whatsapp'
+        let channel: 'whatsapp' | 'email' = 'whatsapp'
+        let whatsappSent = false
 
-        // Send OTP via WhatsApp only
-        if (!customerPhone) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Numero di telefono non trovato. Contatta DR7 Empire.' }) }
+        // Try WhatsApp first
+        if (customerPhone && GREEN_API_INSTANCE_ID && GREEN_API_TOKEN) {
+            try {
+                let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
+                if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
+                if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
+
+                const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
+                const waResponse = await fetch(greenApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chatId: `${cleanPhone}@c.us`,
+                        message: `*DR7 Empire - Codice di Verifica*\n\nIl tuo codice OTP per la firma del contratto e:\n\n*${otp}*\n\nIl codice scade tra ${OTP_EXPIRY_MINUTES} minuti.\n\nSe non hai richiesto questo codice, ignora questo messaggio.`
+                    })
+                })
+
+                const waResult = await waResponse.json()
+                if (waResponse.ok && waResult.idMessage) {
+                    whatsappSent = true
+                    channel = 'whatsapp'
+                    console.log(`[signature-send-otp] OTP sent via WhatsApp to ${cleanPhone}:`, waResult.idMessage)
+                } else {
+                    console.warn('[signature-send-otp] WhatsApp send failed:', waResult)
+                }
+            } catch (waErr: any) {
+                console.warn('[signature-send-otp] WhatsApp error:', waErr.message)
+            }
+        } else {
+            console.log(`[signature-send-otp] WhatsApp not available: phone="${customerPhone}", GREEN_API=${GREEN_API_INSTANCE_ID ? 'set' : 'NOT SET'}`)
         }
 
-        if (!GREEN_API_INSTANCE_ID || !GREEN_API_TOKEN) {
-            return { statusCode: 500, body: JSON.stringify({ error: 'Servizio WhatsApp non configurato. Contatta DR7 Empire.' }) }
+        // Fallback to email if WhatsApp failed
+        if (!whatsappSent) {
+            if (!sigRequest.signer_email) {
+                return { statusCode: 400, body: JSON.stringify({ error: 'Impossibile inviare il codice OTP. Nessun numero di telefono o email disponibile.' }) }
+            }
+
+            try {
+                await resend.emails.send({
+                    from: 'Trustera <noreply@trustera360.app>',
+                    to: sigRequest.signer_email,
+                    subject: 'Codice di Verifica - Firma Contratto',
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
+                            <h2 style="color: #333;">Codice di Verifica</h2>
+                            <p>Il tuo codice OTP per la firma del contratto e:</p>
+                            <div style="background: #f5f5f5; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                                <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #333;">${otp}</span>
+                            </div>
+                            <p style="color: #666; font-size: 14px;">Il codice scade tra ${OTP_EXPIRY_MINUTES} minuti.</p>
+                            <p style="color: #999; font-size: 12px;">Se non hai richiesto questo codice, ignora questo messaggio.</p>
+                        </div>
+                    `
+                })
+                channel = 'email'
+                console.log(`[signature-send-otp] OTP sent via email to ${sigRequest.signer_email}`)
+            } catch (emailErr: any) {
+                console.error('[signature-send-otp] Email send failed:', emailErr.message)
+                return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio del codice OTP. Riprova.' }) }
+            }
         }
-
-        let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
-        if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
-        if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
-
-        const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
-        const waResponse = await fetch(greenApiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chatId: `${cleanPhone}@c.us`,
-                message: `*DR7 Empire - Codice di Verifica*\n\nIl tuo codice OTP per la firma del contratto e:\n\n*${otp}*\n\nIl codice scade tra ${OTP_EXPIRY_MINUTES} minuti.\n\nSe non hai richiesto questo codice, ignora questo messaggio.`
-            })
-        })
-
-        const waResult = await waResponse.json()
-        if (!waResponse.ok || !waResult.idMessage) {
-            console.error('[signature-send-otp] WhatsApp send failed:', waResult)
-            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio del codice WhatsApp. Riprova.' }) }
-        }
-
-        console.log(`[signature-send-otp] OTP sent via WhatsApp to ${cleanPhone}:`, waResult.idMessage)
 
         // Log audit
         await supabase.from('signature_audit_trail').insert({

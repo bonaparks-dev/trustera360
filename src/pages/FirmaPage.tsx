@@ -289,9 +289,9 @@ export default function FirmaPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-black text-white py-4 px-6 flex items-center justify-between">
+            <div className="bg-white text-gray-800 py-4 px-6 flex items-center justify-between shadow-sm border-b border-gray-200">
                 <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
-                <span className="text-sm text-gray-400">Firma Elettronica</span>
+                <span className="text-sm text-green-700 font-medium">Firma Elettronica</span>
             </div>
 
             <div className="max-w-3xl mx-auto p-4 sm:p-6">

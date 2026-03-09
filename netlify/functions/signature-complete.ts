@@ -93,6 +93,41 @@ export const handler: Handler = async (event) => {
             }
         }
 
+        // Determine OTP channel from audit trail
+        let otpChannel: 'whatsapp' | 'email' = 'whatsapp'
+        let otpPhone = ''
+        const { data: otpAudit } = await supabase
+            .from('signature_audit_trail')
+            .select('metadata')
+            .eq('signature_request_id', sigRequest.id)
+            .eq('event_type', 'otp_sent')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        if (otpAudit?.metadata?.channel) {
+            otpChannel = otpAudit.metadata.channel
+        }
+
+        // Get signer phone for attestation
+        if (sigRequest.booking_id) {
+            const { data: booking } = await supabase
+                .from('bookings')
+                .select('customer_phone, booking_details')
+                .eq('id', sigRequest.booking_id)
+                .single()
+            if (booking) {
+                otpPhone = booking.customer_phone || booking.booking_details?.customer?.phone || ''
+            }
+        }
+        if (!otpPhone && sigRequest.signer_email) {
+            const { data: customer } = await supabase
+                .from('customers_extended')
+                .select('telefono')
+                .eq('email', sigRequest.signer_email)
+                .maybeSingle()
+            if (customer?.telefono) otpPhone = customer.telefono
+        }
+
         // Load and modify PDF — add attestation page
         const pdfDoc = await PDFDocument.load(originalPdfBytes)
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -214,9 +249,15 @@ export const handler: Handler = async (event) => {
         page.drawText('VERIFICA FIRMA', { x: 55, y, size: 10, font: fontBold, color: gray })
         y -= 20
 
+        const otpMethodLabel = otpChannel === 'whatsapp'
+            ? (signatureImage ? 'Firma Elettronica Avanzata via OTP WhatsApp + Firma Autografa' : 'Firma Elettronica Avanzata via OTP WhatsApp')
+            : (signatureImage ? 'Firma Elettronica Avanzata via OTP Email + Firma Autografa' : 'Firma Elettronica Avanzata via OTP Email')
+        const otpDestLabel = otpChannel === 'whatsapp' ? 'WhatsApp OTP:' : 'Email OTP:'
+        const otpDestValue = otpChannel === 'whatsapp' ? (otpPhone || sigRequest.signer_email) : sigRequest.signer_email
+
         const verifyLines = [
-            ['Metodo:', signatureImage ? 'Firma Elettronica Avanzata via OTP Email + Firma Autografa' : 'Firma Elettronica Avanzata via OTP Email'],
-            ['Email OTP:', sigRequest.signer_email],
+            ['Metodo:', otpMethodLabel],
+            [otpDestLabel, otpDestValue],
             ['IP firmatario:', ipAddress],
             ['User Agent:', (userAgent || '').substring(0, 70)],
             ['Hash SHA-256:', currentHash.substring(0, 32) + '...'],
@@ -238,7 +279,9 @@ export const handler: Handler = async (event) => {
             `contratto sopra indicato e di approvarne integralmente il contenuto.`,
             ``,
             `La firma e stata apposta tramite verifica dell'identita via codice OTP`,
-            `inviato all'indirizzo email ${sigRequest.signer_email}, in conformita`,
+            otpChannel === 'whatsapp'
+                ? `inviato via WhatsApp al numero ${otpPhone || 'del firmatario'}, in conformita`
+                : `inviato all'indirizzo email ${sigRequest.signer_email}, in conformita`,
             `con il Regolamento eIDAS (UE) n. 910/2014 e il CAD (D.Lgs. 82/2005).`,
             ``,
             `Il presente documento e stato firmato elettronicamente e qualsiasi`,

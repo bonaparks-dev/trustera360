@@ -547,8 +547,7 @@ export default function FirmaPage() {
                         {signedPdfUrl && (
                             <a
                                 href={signedPdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                                download={`Contratto_Firmato_${contract?.contractNumber || ''}.pdf`}
                                 className="inline-block bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
                             >
                                 Scarica Contratto Firmato

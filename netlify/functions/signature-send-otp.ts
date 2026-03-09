@@ -1,6 +1,5 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
-import { Resend } from 'resend'
 
 const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
@@ -124,80 +123,38 @@ export const handler: Handler = async (event) => {
 
         console.log(`[signature-send-otp] Final customerPhone="${customerPhone}", GREEN_API_INSTANCE_ID=${GREEN_API_INSTANCE_ID ? 'set' : 'NOT SET'}, GREEN_API_TOKEN=${GREEN_API_TOKEN ? 'set' : 'NOT SET'}`)
 
-        let channel: 'whatsapp' | 'email' = 'email'
+        const channel: 'whatsapp' = 'whatsapp'
 
-        // Try WhatsApp first
-        if (customerPhone && GREEN_API_INSTANCE_ID && GREEN_API_TOKEN) {
-            try {
-                let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
-                if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
-                if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
-
-                const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
-                const waResponse = await fetch(greenApiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chatId: `${cleanPhone}@c.us`,
-                        message: `*DR7 Empire - Codice di Verifica*\n\nIl tuo codice OTP per la firma del contratto e:\n\n*${otp}*\n\nIl codice scade tra ${OTP_EXPIRY_MINUTES} minuti.\n\nSe non hai richiesto questo codice, ignora questo messaggio.`
-                    })
-                })
-
-                const waResult = await waResponse.json()
-                if (waResponse.ok && waResult.idMessage) {
-                    channel = 'whatsapp'
-                    console.log(`[signature-send-otp] OTP sent via WhatsApp to ${cleanPhone}:`, waResult.idMessage)
-                } else {
-                    console.warn('[signature-send-otp] WhatsApp send failed, falling back to email:', waResult)
-                }
-            } catch (waErr: any) {
-                console.warn('[signature-send-otp] WhatsApp error, falling back to email:', waErr.message)
-            }
+        // Send OTP via WhatsApp only
+        if (!customerPhone) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'Numero di telefono non trovato. Contatta DR7 Empire.' }) }
         }
 
-        // Fallback to email if WhatsApp didn't work
-        if (channel === 'email') {
-            const apiKey = process.env.RESEND_API_KEY
-            if (!apiKey) {
-                return { statusCode: 500, body: JSON.stringify({ error: 'Impossibile inviare il codice OTP. Contatta DR7 Empire.' }) }
-            }
+        if (!GREEN_API_INSTANCE_ID || !GREEN_API_TOKEN) {
+            return { statusCode: 500, body: JSON.stringify({ error: 'Servizio WhatsApp non configurato. Contatta DR7 Empire.' }) }
+        }
 
-            const resend = new Resend(apiKey)
+        let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
+        if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
+        if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
 
-            const { error: emailError } = await resend.emails.send({
-                from: 'DR7 Empire <info@dr7.app>',
-                to: sigRequest.signer_email,
-                subject: 'Codice di Verifica - DR7 Empire',
-                text: `Il tuo codice di verifica DR7 Empire e: ${otp}\n\nIl codice scade tra ${OTP_EXPIRY_MINUTES} minuti.\n\nSe non hai richiesto questo codice, ignora questa email.\n\nDubai rent 7.0 S.p.A. - www.dr7empire.com`,
-                html: `
-                    <div style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                        <div style="text-align: center; margin-bottom: 30px;">
-                            <img src="https://dr7empire.com/DR7logo1.png" alt="DR7" style="height: 60px;" />
-                        </div>
-                        <h2 style="color: #111; text-align: center;">Codice di Verifica</h2>
-                        <p style="text-align: center;">Usa questo codice per confermare la tua firma:</p>
-                        <div style="text-align: center; margin: 30px 0;">
-                            <div style="display: inline-block; background: #f5f5f5; padding: 20px 40px; border-radius: 12px; letter-spacing: 8px; font-size: 32px; font-weight: 700; color: #111; border: 2px solid #d4af37;">
-                                ${otp}
-                            </div>
-                        </div>
-                        <p style="text-align: center; color: #666; font-size: 13px;">Il codice scade tra ${OTP_EXPIRY_MINUTES} minuti.</p>
-                        <p style="text-align: center; color: #666; font-size: 13px;">Se non hai richiesto questo codice, ignora questa email.</p>
-                        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-                        <p style="color: #999; font-size: 11px; text-align: center;">
-                            Dubai rent 7.0 S.p.A. - www.dr7empire.com
-                        </p>
-                    </div>
-                `
+        const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
+        const waResponse = await fetch(greenApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chatId: `${cleanPhone}@c.us`,
+                message: `*DR7 Empire - Codice di Verifica*\n\nIl tuo codice OTP per la firma del contratto e:\n\n*${otp}*\n\nIl codice scade tra ${OTP_EXPIRY_MINUTES} minuti.\n\nSe non hai richiesto questo codice, ignora questo messaggio.`
             })
+        })
 
-            if (emailError) {
-                console.error('Resend OTP error:', emailError)
-                return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio del codice OTP', details: emailError.message }) }
-            }
-
-            console.log(`[signature-send-otp] OTP sent via email to ${sigRequest.signer_email}`)
+        const waResult = await waResponse.json()
+        if (!waResponse.ok || !waResult.idMessage) {
+            console.error('[signature-send-otp] WhatsApp send failed:', waResult)
+            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio del codice WhatsApp. Riprova.' }) }
         }
+
+        console.log(`[signature-send-otp] OTP sent via WhatsApp to ${cleanPhone}:`, waResult.idMessage)
 
         // Log audit
         await supabase.from('signature_audit_trail').insert({

@@ -62,8 +62,15 @@ export const handler: Handler = async (event) => {
             return { statusCode: 404, body: JSON.stringify({ error: 'Contratto o PDF non trovato' }) }
         }
 
-        // Download original PDF
-        const pdfResponse = await fetch(contract.pdf_url)
+        // Download original PDF (use signed URL if public URL fails)
+        let pdfUrl = contract.pdf_url
+        const contractMatch = pdfUrl?.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(\?|$)/)
+        if (contractMatch) {
+            const { data: signedData } = await supabase.storage.from(contractMatch[1]).createSignedUrl(contractMatch[2], 600)
+            if (signedData?.signedUrl) pdfUrl = signedData.signedUrl
+        }
+
+        const pdfResponse = await fetch(pdfUrl)
         if (!pdfResponse.ok) {
             return { statusCode: 500, body: JSON.stringify({ error: 'Impossibile scaricare il PDF' }) }
         }
@@ -281,8 +288,9 @@ export const handler: Handler = async (event) => {
             throw new Error(`Upload failed: ${uploadError.message}`)
         }
 
-        const { data: publicUrl } = supabase.storage.from('contracts').getPublicUrl(fileName)
-        const signedPdfUrl = publicUrl.publicUrl
+        // Generate a long-lived signed URL (7 days) for the signed PDF
+        const { data: signedUrlData } = await supabase.storage.from('contracts').createSignedUrl(fileName, 7 * 24 * 3600)
+        const signedPdfUrl = signedUrlData?.signedUrl || supabase.storage.from('contracts').getPublicUrl(fileName).data.publicUrl
 
         // Update signature request as signed
         await supabase

@@ -77,9 +77,20 @@ export const handler: Handler = async (event) => {
 
     // Try WhatsApp first, fallback to email
     let channel: 'whatsapp' | 'email' = 'email'
+    let signerPhone = doc.signer_phone || ''
 
-    if (doc.signer_phone) {
-      const phone = cleanPhone(doc.signer_phone)
+    // If no phone on document, look up customers_extended
+    if (!signerPhone && doc.signer_email) {
+      const { data: customer } = await supabase
+        .from('customers_extended')
+        .select('telefono')
+        .eq('email', doc.signer_email)
+        .maybeSingle()
+      if (customer?.telefono) signerPhone = customer.telefono
+    }
+
+    if (signerPhone) {
+      const phone = cleanPhone(signerPhone)
       const sent = await sendWhatsAppOtp(phone, otp)
       if (sent) channel = 'whatsapp'
     }

@@ -140,12 +140,22 @@ export const handler: Handler = async (event) => {
       .eq('id', doc.id)
 
     // Send signed PDF via WhatsApp if phone available
-    if (doc.signer_phone) {
+    let signerPhone = doc.signer_phone || ''
+    if (!signerPhone && doc.signer_email) {
+      const { data: customer } = await supabase
+        .from('customers_extended')
+        .select('telefono')
+        .eq('email', doc.signer_email)
+        .maybeSingle()
+      if (customer?.telefono) signerPhone = customer.telefono
+    }
+
+    if (signerPhone) {
       try {
         const idInstance = process.env.GREEN_API_INSTANCE_ID
         const apiToken = process.env.GREEN_API_TOKEN
         if (idInstance && apiToken) {
-          const phone = doc.signer_phone.replace(/[\s\-\(\)]/g, '')
+          const phone = signerPhone.replace(/[\s\-\(\)]/g, '')
           const chatId = (phone.startsWith('+') ? phone.slice(1) : phone) + '@c.us'
           await fetch(`https://api.green-api.com/waInstance${idInstance}/sendFileByUrl/${apiToken}`, {
             method: 'POST',

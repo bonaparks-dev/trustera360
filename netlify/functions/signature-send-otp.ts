@@ -109,6 +109,19 @@ export const handler: Handler = async (event) => {
             }
         }
 
+        // If still no phone, try customers_extended by email
+        if (!customerPhone && sigRequest.signer_email) {
+            const { data: customer } = await supabase
+                .from('customers_extended')
+                .select('telefono')
+                .eq('email', sigRequest.signer_email)
+                .maybeSingle()
+            if (customer?.telefono) {
+                customerPhone = customer.telefono
+                console.log(`[signature-send-otp] customers_extended phone: "${customer.telefono}"`)
+            }
+        }
+
         console.log(`[signature-send-otp] Final customerPhone="${customerPhone}", GREEN_API_INSTANCE_ID=${GREEN_API_INSTANCE_ID ? 'set' : 'NOT SET'}, GREEN_API_TOKEN=${GREEN_API_TOKEN ? 'set' : 'NOT SET'}`)
 
         let channel: 'whatsapp' | 'email' = 'email'

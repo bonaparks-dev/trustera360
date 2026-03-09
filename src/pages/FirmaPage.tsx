@@ -18,7 +18,6 @@ export default function FirmaPage() {
     const [signerName, setSignerName] = useState('')
     const [signerEmail, setSignerEmail] = useState('')
     const [contract, setContract] = useState<ContractInfo | null>(null)
-    const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null)
     const [signedAt, setSignedAt] = useState<string | null>(null)
     const [otp, setOtp] = useState(['', '', '', '', '', ''])
     const [error, setError] = useState('')
@@ -117,7 +116,7 @@ export default function FirmaPage() {
             setContract(data.contract)
 
             if (data.status === 'signed') {
-                setSignedPdfUrl(data.signedPdfUrl)
+    
                 setSignedAt(data.signedAt)
                 setStatus('signed')
             } else {
@@ -216,7 +215,7 @@ export default function FirmaPage() {
             }
 
             const data = await res.json()
-            setSignedPdfUrl(data.signedPdfUrl)
+
             setSignedAt(data.signedAt)
             setStatus('signed')
         } catch {

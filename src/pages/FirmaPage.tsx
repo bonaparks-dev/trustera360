@@ -24,6 +24,8 @@ export default function FirmaPage() {
     const [error, setError] = useState('')
     const [remainingAttempts, setRemainingAttempts] = useState(5)
     const [acceptedTerms, setAcceptedTerms] = useState(false)
+    const [acceptedMarketing, setAcceptedMarketing] = useState<boolean | null>(null)
+    const [showMarketingInfo, setShowMarketingInfo] = useState(false)
     const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
     const otpRefs = useRef<(HTMLInputElement | null)[]>([])
     const [pdfPages, setPdfPages] = useState<string[]>([])
@@ -194,13 +196,17 @@ export default function FirmaPage() {
             setError('Devi accettare i termini per procedere')
             return
         }
+        if (acceptedMarketing === null) {
+            setError('Devi selezionare Si o No per il consenso marketing')
+            return
+        }
 
         setError('')
         try {
             const res = await fetch('/.netlify/functions/signature-complete', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token })
+                body: JSON.stringify({ token, marketingConsent: acceptedMarketing })
             })
 
             if (!res.ok) {
@@ -285,7 +291,7 @@ export default function FirmaPage() {
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <div className="bg-black text-white py-4 px-6 flex items-center justify-between">
-                <img src="https://dr7empire.com/DR7logo1.png" alt="DR7" className="h-10" />
+                <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
                 <span className="text-sm text-gray-400">Firma Elettronica</span>
             </div>
 
@@ -377,7 +383,7 @@ export default function FirmaPage() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
                         <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Contratto</h2>
                         <p className="text-gray-600 text-sm mb-6">
-                            Per procedere con la firma, invieremo un codice di verifica via WhatsApp o email.
+                            Per procedere con la firma, invieremo un codice di verifica via WhatsApp.
                         </p>
                         <button
                             onClick={handleRequestOtp}
@@ -469,7 +475,7 @@ export default function FirmaPage() {
                             </p>
                         </div>
 
-                        <label className="flex items-start gap-3 mb-6 cursor-pointer">
+                        <label className="flex items-start gap-3 mb-4 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={acceptedTerms}
@@ -482,9 +488,43 @@ export default function FirmaPage() {
                             </span>
                         </label>
 
+                        <div className="mb-6">
+                            <p className="text-sm text-gray-700 mb-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMarketingInfo(true)}
+                                    className="underline text-yellow-700 hover:text-yellow-800 transition-colors text-left"
+                                >
+                                    Accetto vantaggi, offerte e sconti dedicati da Trustera e partner.
+                                </button>
+                            </p>
+                            <div className="flex gap-4">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="marketing"
+                                        checked={acceptedMarketing === true}
+                                        onChange={() => setAcceptedMarketing(true)}
+                                        className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">Si</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        name="marketing"
+                                        checked={acceptedMarketing === false}
+                                        onChange={() => setAcceptedMarketing(false)}
+                                        className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                    />
+                                    <span className="text-sm font-medium text-gray-700">No</span>
+                                </label>
+                            </div>
+                        </div>
+
                         <button
                             onClick={handleSign}
-                            disabled={!acceptedTerms}
+                            disabled={!acceptedTerms || acceptedMarketing === null}
                             className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg"
                         >
                             Firma il Documento
@@ -502,7 +542,7 @@ export default function FirmaPage() {
                             {signedAt ? ` il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : ''}.
                         </p>
                         <p className="text-gray-500 text-sm mb-6">
-                            Riceverai una copia del contratto firmato via email.
+                            Riceverai una copia del contratto firmato via WhatsApp.
                         </p>
                         {signedPdfUrl && (
                             <a
@@ -522,6 +562,37 @@ export default function FirmaPage() {
             <div className="text-center py-6 text-xs text-gray-400">
                 Dubai rent 7.0 S.p.A. - Via del Fangario 25, 09122 Cagliari (CA) - P.IVA 04104640927
             </div>
+
+            {/* Marketing Informativa Modal */}
+            {showMarketingInfo && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">Informativa Marketing</h3>
+                        <div className="text-sm text-gray-600 space-y-3">
+                            <p>
+                                Ai sensi del Regolamento UE 2016/679 (GDPR), il tuo consenso ci autorizza a inviarti
+                                comunicazioni promozionali relative a offerte, sconti e vantaggi dedicati da parte di
+                                Trustera e dei suoi partner commerciali.
+                            </p>
+                            <p>
+                                Le comunicazioni potranno essere inviate tramite WhatsApp, email o SMS.
+                                Potrai revocare il consenso in qualsiasi momento contattandoci all'indirizzo
+                                privacy@trustera360.app o tramite il link di disiscrizione presente in ogni comunicazione.
+                            </p>
+                            <p>
+                                I tuoi dati non saranno ceduti a terzi senza il tuo esplicito consenso e saranno
+                                trattati nel rispetto della normativa vigente.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setShowMarketingInfo(false)}
+                            className="mt-6 w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-lg transition-colors"
+                        >
+                            Chiudi
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

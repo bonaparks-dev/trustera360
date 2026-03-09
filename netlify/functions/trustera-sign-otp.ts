@@ -18,7 +18,7 @@ function cleanPhone(phone: string): string {
 }
 
 async function sendWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
-  const idInstance = process.env.GREEN_API_ID_INSTANCE
+  const idInstance = process.env.GREEN_API_INSTANCE_ID
   const apiToken = process.env.GREEN_API_TOKEN
   if (!idInstance || !apiToken) return false
 
@@ -67,7 +67,7 @@ export const handler: Handler = async (event) => {
     }
 
     // Generate 6-digit OTP
-    const otp = crypto.randomInt(100000, 999999).toString()
+    const otp = crypto.randomInt(100000, 1000000).toString()
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min
 
     await supabase

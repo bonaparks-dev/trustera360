@@ -142,7 +142,7 @@ export const handler: Handler = async (event) => {
     // Send signed PDF via WhatsApp if phone available
     if (doc.signer_phone) {
       try {
-        const idInstance = process.env.GREEN_API_ID_INSTANCE
+        const idInstance = process.env.GREEN_API_INSTANCE_ID
         const apiToken = process.env.GREEN_API_TOKEN
         if (idInstance && apiToken) {
           const phone = doc.signer_phone.replace(/[\s\-\(\)]/g, '')

@@ -2,7 +2,7 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
@@ -72,18 +72,37 @@ export const handler: Handler = async (event) => {
             })
         }
 
+        // Generate signed URLs for PDFs (public URLs fail if bucket isn't public)
+        let contractPdfUrl = contract?.pdf_url
+        if (contractPdfUrl) {
+            const contractMatch = contractPdfUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)/)
+            if (contractMatch) {
+                const { data: signedData } = await supabase.storage.from(contractMatch[1]).createSignedUrl(contractMatch[2], 3600)
+                if (signedData?.signedUrl) contractPdfUrl = signedData.signedUrl
+            }
+        }
+
+        let signedPdfUrl = sigRequest.signed_pdf_url
+        if (signedPdfUrl) {
+            const signedMatch = signedPdfUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)/)
+            if (signedMatch) {
+                const { data: signedData } = await supabase.storage.from(signedMatch[1]).createSignedUrl(signedMatch[2], 3600)
+                if (signedData?.signedUrl) signedPdfUrl = signedData.signedUrl
+            }
+        }
+
         return {
             statusCode: 200,
             body: JSON.stringify({
                 status: sigRequest.status,
                 signerName: sigRequest.signer_name,
                 signerEmail: sigRequest.signer_email,
-                signedPdfUrl: sigRequest.signed_pdf_url,
+                signedPdfUrl,
                 signedAt: sigRequest.signed_at,
                 secondDriverName,
                 contract: contract ? {
                     contractNumber: contract.contract_number,
-                    pdfUrl: contract.pdf_url,
+                    pdfUrl: contractPdfUrl,
                     customerName: contract.customer_name,
                     vehicleName: contract.vehicle_name,
                     rentalStartDate: contract.rental_start_date,

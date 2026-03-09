@@ -44,7 +44,22 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (error) {
       console.error('Error loading documents:', error)
     } else {
-      setDocuments(data || [])
+      // Generate signed URLs for PDFs (public URLs fail if bucket isn't public)
+      const docs = await Promise.all((data || []).map(async (doc: any) => {
+        const getSignedUrl = async (url: string | null) => {
+          if (!url) return url
+          const match = url.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
+          if (!match) return url
+          const { data: signed } = await supabase.storage.from('trustera').createSignedUrl(match[1], 3600)
+          return signed?.signedUrl || url
+        }
+        return {
+          ...doc,
+          pdf_url: await getSignedUrl(doc.pdf_url),
+          signed_pdf_url: await getSignedUrl(doc.signed_pdf_url)
+        }
+      }))
+      setDocuments(docs)
     }
     setLoading(false)
   }

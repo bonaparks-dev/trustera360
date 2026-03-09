@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 const supabase = createClient(
-    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 

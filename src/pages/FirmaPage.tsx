@@ -291,13 +291,16 @@ export default function FirmaPage() {
                 {/* PDF Viewer */}
                 {contract?.pdfUrl && status !== 'signed' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                        <div className="bg-gray-100 px-4 py-2 text-sm text-gray-600 font-medium border-b">
-                            Documento da firmare
+                        <div className="bg-gray-100 px-4 py-2 text-sm text-gray-600 font-medium border-b flex justify-between items-center">
+                            <span>Documento da firmare</span>
+                            <a href={contract.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-yellow-600 hover:text-yellow-700 text-xs font-bold">
+                                Apri PDF completo
+                            </a>
                         </div>
                         <iframe
                             src={contract.pdfUrl}
                             className="w-full border-0"
-                            style={{ height: '500px' }}
+                            style={{ height: '70vh', minHeight: '500px' }}
                             title="Documento PDF"
                         />
                     </div>

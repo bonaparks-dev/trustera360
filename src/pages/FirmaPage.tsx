@@ -76,7 +76,7 @@ export default function FirmaPage() {
                 setStatus('viewing')
             }
         } catch {
-            setError('Impossibile caricare i dati del contratto')
+            setError('Impossibile caricare i dati del documento')
             setStatus('error')
         }
     }
@@ -212,7 +212,7 @@ export default function FirmaPage() {
             <div className="min-h-screen bg-gray-50 flex items-center justify-center">
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Caricamento contratto...</p>
+                    <p className="text-gray-600">Caricamento documento...</p>
                 </div>
             </div>
         )
@@ -224,7 +224,7 @@ export default function FirmaPage() {
                 <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
                     <div className="text-5xl mb-4">&#8987;</div>
                     <h1 className="text-2xl font-bold text-gray-800 mb-2">Link Scaduto</h1>
-                    <p className="text-gray-600">Il link di firma e scaduto. Contatta DR7 Empire per ricevere un nuovo link.</p>
+                    <p className="text-gray-600">Il link di firma e scaduto. Contatta il mittente per ricevere un nuovo link.</p>
                 </div>
             </div>
         )
@@ -245,9 +245,9 @@ export default function FirmaPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-black text-white py-4 px-6 flex items-center justify-between">
-                <img src="https://dr7empire.com/DR7logo1.png" alt="DR7" className="h-10" />
-                <span className="text-sm text-gray-400">Firma Elettronica</span>
+            <div className="bg-white py-4 px-6 flex items-center justify-between shadow-sm border-b border-gray-200">
+                <img src="/trustera-icon.jpeg" alt="Trustera" className="h-10" />
+                <span className="text-sm text-gray-500">Firma Elettronica</span>
             </div>
 
             <div className="max-w-2xl mx-auto p-4 sm:p-6">
@@ -298,7 +298,7 @@ export default function FirmaPage() {
                             src={contract.pdfUrl}
                             className="w-full border-0"
                             style={{ height: '500px' }}
-                            title="Contratto PDF"
+                            title="Documento PDF"
                         />
                     </div>
                 )}
@@ -313,7 +313,7 @@ export default function FirmaPage() {
                 {/* Step 1: Request OTP */}
                 {status === 'viewing' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
-                        <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Contratto</h2>
+                        <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Documento</h2>
                         <p className="text-gray-600 text-sm mb-6">
                             Per procedere con la firma, invieremo un codice di verifica via WhatsApp o email.
                         </p>
@@ -414,7 +414,7 @@ export default function FirmaPage() {
                                 className="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                             />
                             <span className="text-sm text-gray-700">
-                                Confermo che i dati inseriti sono corretti e accetto i termini e le condizioni del contratto.
+                                Confermo che i dati inseriti sono corretti e accetto i termini e le condizioni del documento.
                             </span>
                         </label>
 
@@ -470,11 +470,11 @@ export default function FirmaPage() {
                         <div className="text-5xl mb-4">&#9989;</div>
                         <h2 className="text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
                         <p className="text-gray-600 mb-2">
-                            Il contratto e stato firmato con successo
+                            Il documento e stato firmato con successo
                             {signedAt ? ` il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : ''}.
                         </p>
                         <p className="text-gray-500 text-sm mb-6">
-                            Riceverai una copia del contratto firmato via WhatsApp.
+                            Riceverai una copia del documento firmato via WhatsApp.
                         </p>
                         {signedPdfUrl && (
                             <a
@@ -483,7 +483,7 @@ export default function FirmaPage() {
                                 rel="noopener noreferrer"
                                 className="inline-block bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
                             >
-                                Scarica Contratto Firmato
+                                Scarica Documento Firmato
                             </a>
                         )}
                     </div>

@@ -104,26 +104,44 @@ export const handler: Handler = async (event) => {
             })
         }
 
+        // Generate signed URLs for PDFs (public URLs fail if bucket isn't public)
+        async function getSignedUrl(url: string | null): Promise<string | null> {
+            if (!url) return null
+            try {
+                const match = url.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(?:\?.*)?$/)
+                if (match) {
+                    const { data } = await supabase.storage.from(match[1]).createSignedUrl(decodeURIComponent(match[2]), 3600)
+                    if (data?.signedUrl) return data.signedUrl
+                }
+            } catch (e) {
+                console.warn('[signature-get] Failed to create signed URL, using original:', e)
+            }
+            return url
+        }
+
+        const contractPdfUrl = contract ? await getSignedUrl(contract.pdf_url) : await getSignedUrl(sigRequest.document_url)
+        const signedPdfUrl = await getSignedUrl(sigRequest.signed_pdf_url)
+
         return {
             statusCode: 200,
             body: JSON.stringify({
                 status: sigRequest.status,
                 signerName: sigRequest.signer_name,
                 signerEmail: sigRequest.signer_email,
-                signedPdfUrl: sigRequest.signed_pdf_url,
+                signedPdfUrl,
                 signedAt: sigRequest.signed_at,
                 secondDriverName,
                 existingMarketingConsent,
                 contract: contract ? {
                     contractNumber: contract.contract_number,
-                    pdfUrl: contract.pdf_url,
+                    pdfUrl: contractPdfUrl,
                     customerName: contract.customer_name,
                     vehicleName: contract.vehicle_name,
                     rentalStartDate: contract.rental_start_date,
                     rentalEndDate: contract.rental_end_date
                 } : sigRequest.document_url ? {
                     contractNumber: sigRequest.document_name || 'Documento',
-                    pdfUrl: sigRequest.document_url,
+                    pdfUrl: contractPdfUrl,
                     customerName: sigRequest.signer_name,
                     vehicleName: null,
                     rentalStartDate: null,

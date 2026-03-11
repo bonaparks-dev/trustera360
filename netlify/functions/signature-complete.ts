@@ -437,6 +437,28 @@ export const handler: Handler = async (event) => {
             }
         }
 
+        // Auto-send to CARGOS via admin panel (only for rental contracts with booking_id)
+        if (contract?.booking_id) {
+            try {
+                const cargosRes = await fetch('https://admin.dr7empire.com/.netlify/functions/cargos-auto-trigger', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Cargos-Key': process.env.CARGOS_TRIGGER_KEY || 'dr7-cargos-auto-2024'
+                    },
+                    body: JSON.stringify({ bookingId: contract.booking_id })
+                })
+                const cargosResult = await cargosRes.json()
+                if (cargosResult.success) {
+                    console.log('[signature-complete] ✅ Contract auto-sent to CARGOS via admin')
+                } else {
+                    console.warn('[signature-complete] ⚠️ CARGOS auto-send failed:', cargosResult.error)
+                }
+            } catch (cargosErr: any) {
+                console.error('[signature-complete] ⚠️ CARGOS trigger error:', cargosErr.message)
+            }
+        }
+
         return {
             statusCode: 200,
             body: JSON.stringify({

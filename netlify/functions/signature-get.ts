@@ -21,7 +21,7 @@ export const handler: Handler = async (event) => {
         // Fetch signature request
         const { data: sigRequest, error } = await supabase
             .from('signature_requests')
-            .select('id, contract_id, signer_name, signer_email, status, token_expires_at, signed_pdf_url, signed_at')
+            .select('id, contract_id, signer_name, signer_email, status, token_expires_at, signed_pdf_url, signed_at, document_url, document_name')
             .eq('token', token)
             .single()
 
@@ -38,26 +38,56 @@ export const handler: Handler = async (event) => {
             return { statusCode: 410, body: JSON.stringify({ error: 'Il link di firma e scaduto', status: 'expired' }) }
         }
 
-        // Fetch contract for PDF URL and details
-        const { data: contract } = await supabase
-            .from('contracts')
-            .select('contract_number, pdf_url, customer_name, vehicle_name, rental_start_date, rental_end_date, booking_id')
-            .eq('id', sigRequest.contract_id)
-            .single()
-
-        // Check if booking has a second driver
+        // Fetch contract for PDF URL and details (only if contract_id exists)
+        let contract: any = null
         let secondDriverName: string | null = null
-        if (contract?.booking_id) {
-            const { data: booking } = await supabase
-                .from('bookings')
-                .select('booking_details')
-                .eq('id', contract.booking_id)
-                .single()
+        let existingMarketingConsent: boolean | null = null
 
-            if (booking?.booking_details?.second_driver) {
-                const sd = booking.booking_details.second_driver
-                secondDriverName = sd.fullName || sd.full_name || sd.name ||
-                    [sd.nome, sd.cognome].filter(Boolean).join(' ') || null
+        if (sigRequest.contract_id) {
+            const { data: contractData } = await supabase
+                .from('contracts')
+                .select('contract_number, pdf_url, customer_name, vehicle_name, rental_start_date, rental_end_date, booking_id')
+                .eq('id', sigRequest.contract_id)
+                .single()
+            contract = contractData
+
+            // Check if booking has a second driver, and fetch existing marketing consent
+            if (contract?.booking_id) {
+                const { data: booking } = await supabase
+                    .from('bookings')
+                    .select('booking_details, customer_email')
+                    .eq('id', contract.booking_id)
+                    .single()
+
+                if (booking?.booking_details?.second_driver) {
+                    const sd = booking.booking_details.second_driver
+                    secondDriverName = sd.fullName || sd.full_name || sd.name ||
+                        [sd.nome, sd.cognome].filter(Boolean).join(' ') || null
+                }
+
+                // Look up existing marketing consent from customers_extended
+                const customerEmail = booking?.customer_email || booking?.booking_details?.customer?.email
+                if (customerEmail) {
+                    const { data: extCustomer } = await supabase
+                        .from('customers_extended')
+                        .select('marketing_consent')
+                        .eq('email', customerEmail)
+                        .maybeSingle()
+
+                    if (extCustomer) {
+                        existingMarketingConsent = extCustomer.marketing_consent ?? null
+                    }
+                }
+            }
+        } else if (sigRequest.signer_email) {
+            // For standalone documents, look up marketing consent by email
+            const { data: extCustomer } = await supabase
+                .from('customers_extended')
+                .select('marketing_consent')
+                .eq('email', sigRequest.signer_email)
+                .maybeSingle()
+            if (extCustomer) {
+                existingMarketingConsent = extCustomer.marketing_consent ?? null
             }
         }
 
@@ -72,41 +102,30 @@ export const handler: Handler = async (event) => {
             })
         }
 
-        // Generate signed URLs for PDFs (public URLs fail if bucket isn't public)
-        let contractPdfUrl = contract?.pdf_url
-        if (contractPdfUrl) {
-            const contractMatch = contractPdfUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)/)
-            if (contractMatch) {
-                const { data: signedData } = await supabase.storage.from(contractMatch[1]).createSignedUrl(contractMatch[2], 3600)
-                if (signedData?.signedUrl) contractPdfUrl = signedData.signedUrl
-            }
-        }
-
-        let signedPdfUrl = sigRequest.signed_pdf_url
-        if (signedPdfUrl) {
-            const signedMatch = signedPdfUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+)/)
-            if (signedMatch) {
-                const { data: signedData } = await supabase.storage.from(signedMatch[1]).createSignedUrl(signedMatch[2], 3600)
-                if (signedData?.signedUrl) signedPdfUrl = signedData.signedUrl
-            }
-        }
-
         return {
             statusCode: 200,
             body: JSON.stringify({
                 status: sigRequest.status,
                 signerName: sigRequest.signer_name,
                 signerEmail: sigRequest.signer_email,
-                signedPdfUrl,
+                signedPdfUrl: sigRequest.signed_pdf_url,
                 signedAt: sigRequest.signed_at,
                 secondDriverName,
+                existingMarketingConsent,
                 contract: contract ? {
                     contractNumber: contract.contract_number,
-                    pdfUrl: contractPdfUrl,
+                    pdfUrl: contract.pdf_url,
                     customerName: contract.customer_name,
                     vehicleName: contract.vehicle_name,
                     rentalStartDate: contract.rental_start_date,
                     rentalEndDate: contract.rental_end_date
+                } : sigRequest.document_url ? {
+                    contractNumber: sigRequest.document_name || 'Documento',
+                    pdfUrl: sigRequest.document_url,
+                    customerName: sigRequest.signer_name,
+                    vehicleName: null,
+                    rentalStartDate: null,
+                    rentalEndDate: null
                 } : null
             })
         }

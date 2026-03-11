@@ -2,7 +2,6 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
-
 const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -51,25 +50,31 @@ export const handler: Handler = async (event) => {
             return { statusCode: 410, body: JSON.stringify({ error: 'Il link di firma e scaduto' }) }
         }
 
-        // Fetch original contract
-        const { data: contract } = await supabase
-            .from('contracts')
-            .select('*')
-            .eq('id', sigRequest.contract_id)
-            .single()
+        // Fetch original document — either from contract or standalone document
+        let contract: any = null
+        let pdfUrl: string | null = null
+        let docIdentifier: string = sigRequest.id
 
-        if (!contract || !contract.pdf_url) {
-            return { statusCode: 404, body: JSON.stringify({ error: 'Contratto o PDF non trovato' }) }
+        if (sigRequest.contract_id) {
+            const { data: contractData } = await supabase
+                .from('contracts')
+                .select('*')
+                .eq('id', sigRequest.contract_id)
+                .single()
+            contract = contractData
+            pdfUrl = contract?.pdf_url
+            docIdentifier = contract?.contract_number || sigRequest.contract_id
+        } else {
+            // Standalone document
+            pdfUrl = sigRequest.document_url
+            docIdentifier = sigRequest.document_name || 'documento'
         }
 
-        // Download original PDF (use signed URL if public URL fails)
-        let pdfUrl = contract.pdf_url
-        const contractMatch = pdfUrl?.match(/\/storage\/v1\/object\/(?:public|sign)\/([^/]+)\/(.+?)(\?|$)/)
-        if (contractMatch) {
-            const { data: signedData } = await supabase.storage.from(contractMatch[1]).createSignedUrl(contractMatch[2], 600)
-            if (signedData?.signedUrl) pdfUrl = signedData.signedUrl
+        if (!pdfUrl) {
+            return { statusCode: 404, body: JSON.stringify({ error: 'Documento PDF non trovato' }) }
         }
 
+        // Download original PDF
         const pdfResponse = await fetch(pdfUrl)
         if (!pdfResponse.ok) {
             return { statusCode: 500, body: JSON.stringify({ error: 'Impossibile scaricare il PDF' }) }
@@ -91,41 +96,6 @@ export const handler: Handler = async (event) => {
                 statusCode: 409,
                 body: JSON.stringify({ error: 'Il documento e stato modificato dopo la creazione della richiesta di firma. Genera una nuova richiesta.' })
             }
-        }
-
-        // Determine OTP channel from audit trail
-        let otpChannel: 'whatsapp' | 'email' = 'whatsapp'
-        let otpPhone = ''
-        const { data: otpAudit } = await supabase
-            .from('signature_audit_trail')
-            .select('metadata')
-            .eq('signature_request_id', sigRequest.id)
-            .eq('event_type', 'otp_sent')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        if (otpAudit?.metadata?.channel) {
-            otpChannel = otpAudit.metadata.channel
-        }
-
-        // Get signer phone for attestation
-        if (sigRequest.booking_id) {
-            const { data: booking } = await supabase
-                .from('bookings')
-                .select('customer_phone, booking_details')
-                .eq('id', sigRequest.booking_id)
-                .single()
-            if (booking) {
-                otpPhone = booking.customer_phone || booking.booking_details?.customer?.phone || ''
-            }
-        }
-        if (!otpPhone && sigRequest.signer_email) {
-            const { data: customer } = await supabase
-                .from('customers_extended')
-                .select('telefono')
-                .eq('email', sigRequest.signer_email)
-                .maybeSingle()
-            if (customer?.telefono) otpPhone = customer.telefono
         }
 
         // Load and modify PDF — add attestation page
@@ -230,7 +200,7 @@ export const handler: Handler = async (event) => {
         y -= 20
 
         const infoLines = [
-            ['Contratto:', contract.contract_number || 'N/A'],
+            ['Documento:', contract ? (contract.contract_number || 'N/A') : (sigRequest.document_name || 'Documento')],
             ['Cliente:', sigRequest.signer_name],
             ['Email:', sigRequest.signer_email],
             ['Data firma:', signedAtRome],
@@ -249,15 +219,9 @@ export const handler: Handler = async (event) => {
         page.drawText('VERIFICA FIRMA', { x: 55, y, size: 10, font: fontBold, color: gray })
         y -= 20
 
-        const otpMethodLabel = otpChannel === 'whatsapp'
-            ? (signatureImage ? 'Firma Elettronica Avanzata via OTP WhatsApp + Firma Autografa' : 'Firma Elettronica Avanzata via OTP WhatsApp')
-            : (signatureImage ? 'Firma Elettronica Avanzata via OTP Email + Firma Autografa' : 'Firma Elettronica Avanzata via OTP Email')
-        const otpDestLabel = otpChannel === 'whatsapp' ? 'WhatsApp OTP:' : 'Email OTP:'
-        const otpDestValue = otpChannel === 'whatsapp' ? (otpPhone || sigRequest.signer_email) : sigRequest.signer_email
-
         const verifyLines = [
-            ['Metodo:', otpMethodLabel],
-            [otpDestLabel, otpDestValue],
+            ['Metodo:', signatureImage ? 'Firma Elettronica Avanzata via OTP Email + Firma Autografa' : 'Firma Elettronica Avanzata via OTP Email'],
+            ['Email OTP:', sigRequest.signer_email],
             ['IP firmatario:', ipAddress],
             ['User Agent:', (userAgent || '').substring(0, 70)],
             ['Hash SHA-256:', currentHash.substring(0, 32) + '...'],
@@ -279,9 +243,7 @@ export const handler: Handler = async (event) => {
             `contratto sopra indicato e di approvarne integralmente il contenuto.`,
             ``,
             `La firma e stata apposta tramite verifica dell'identita via codice OTP`,
-            otpChannel === 'whatsapp'
-                ? `inviato via WhatsApp al numero ${otpPhone || 'del firmatario'}, in conformita`
-                : `inviato all'indirizzo email ${sigRequest.signer_email}, in conformita`,
+            `inviato all'indirizzo email ${sigRequest.signer_email}, in conformita`,
             `con il Regolamento eIDAS (UE) n. 910/2014 e il CAD (D.Lgs. 82/2005).`,
             ``,
             `Il presente documento e stato firmato elettronicamente e qualsiasi`,
@@ -318,7 +280,7 @@ export const handler: Handler = async (event) => {
         const signedPdfHash = crypto.createHash('sha256').update(Buffer.from(signedPdfBytes)).digest('hex')
 
         // Upload signed PDF to Supabase storage
-        const fileName = `signed/${contract.contract_number || sigRequest.contract_id}_firmato_${Date.now()}.pdf`
+        const fileName = `signed/${docIdentifier}_firmato_${Date.now()}.pdf`
         const { error: uploadError } = await supabase
             .storage
             .from('contracts')
@@ -331,9 +293,8 @@ export const handler: Handler = async (event) => {
             throw new Error(`Upload failed: ${uploadError.message}`)
         }
 
-        // Generate a long-lived signed URL (7 days) for the signed PDF
-        const { data: signedUrlData } = await supabase.storage.from('contracts').createSignedUrl(fileName, 7 * 24 * 3600)
-        const signedPdfUrl = signedUrlData?.signedUrl || supabase.storage.from('contracts').getPublicUrl(fileName).data.publicUrl
+        const { data: publicUrl } = supabase.storage.from('contracts').getPublicUrl(fileName)
+        const signedPdfUrl = publicUrl.publicUrl
 
         // Update signature request as signed
         await supabase
@@ -349,14 +310,16 @@ export const handler: Handler = async (event) => {
             })
             .eq('id', sigRequest.id)
 
-        // Update contract record
-        await supabase
-            .from('contracts')
-            .update({
-                signed_pdf_url: signedPdfUrl,
-                updated_at: signedAt.toISOString()
-            })
-            .eq('id', sigRequest.contract_id)
+        // Update contract record (only if this is a contract-based signature)
+        if (sigRequest.contract_id) {
+            await supabase
+                .from('contracts')
+                .update({
+                    signed_pdf_url: signedPdfUrl,
+                    updated_at: signedAt.toISOString()
+                })
+                .eq('id', sigRequest.contract_id)
+        }
 
         // Log final audit event
         await supabase.from('signature_audit_trail').insert({
@@ -371,13 +334,13 @@ export const handler: Handler = async (event) => {
                 original_pdf_hash: currentHash,
                 signed_pdf_hash: signedPdfHash,
                 signed_pdf_url: signedPdfUrl,
-                contract_number: contract.contract_number,
+                document_identifier: docIdentifier,
                 marketing_consent: !!marketingConsent
             }
         })
 
-        // Save marketing consent on customer record if provided
-        if (marketingConsent !== undefined && contract.booking_id) {
+        // Save marketing consent on customer record — NEVER overwrite true with false (GDPR: consent once given is kept)
+        if (marketingConsent !== undefined && contract?.booking_id) {
             try {
                 const { data: booking } = await supabase
                     .from('bookings')
@@ -387,32 +350,62 @@ export const handler: Handler = async (event) => {
 
                 const customerEmail = booking?.customer_email || booking?.booking_details?.customer?.email
                 if (customerEmail) {
-                    await supabase
+                    // Fetch the current consent state before writing
+                    const { data: existingCustomer } = await supabase
                         .from('customers_extended')
-                        .update({
-                            marketing_consent: !!marketingConsent,
-                            marketing_consent_date: signedAt.toISOString()
-                        })
+                        .select('marketing_consent')
                         .eq('email', customerEmail)
-                    console.log(`[signature-complete] Marketing consent (${marketingConsent}) saved for ${customerEmail}`)
+                        .maybeSingle()
+
+                    const currentConsent = existingCustomer?.marketing_consent ?? null
+
+                    // Only update if:
+                    // - New consent is true (always record a yes)
+                    // - OR current consent is null (no record yet — record even a no)
+                    // NEVER overwrite true with false
+                    if (currentConsent !== true || !!marketingConsent === true) {
+                        await supabase
+                            .from('customers_extended')
+                            .update({
+                                marketing_consent: !!marketingConsent,
+                                marketing_consent_date: signedAt.toISOString()
+                            })
+                            .eq('email', customerEmail)
+                        console.log(`[signature-complete] Marketing consent (${marketingConsent}) saved for ${customerEmail}`)
+                    } else {
+                        console.log(`[signature-complete] Skipping consent update for ${customerEmail}: existing=true, new=false — kept as true`)
+                    }
                 }
             } catch (mcErr: any) {
                 console.error('[signature-complete] Failed to save marketing consent:', mcErr.message)
             }
         }
 
-        // Send signed contract via WhatsApp
+        // Send signed document via WhatsApp
         const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
         const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
         if (GREEN_API_INSTANCE_ID && GREEN_API_TOKEN && signedPdfUrl) {
             try {
-                const { data: booking } = await supabase
-                    .from('bookings')
-                    .select('customer_phone, booking_details')
-                    .eq('id', contract.booking_id)
-                    .single()
+                let customerPhone = ''
 
-                const customerPhone = booking?.customer_phone || booking?.booking_details?.customer?.phone || ''
+                if (contract?.booking_id) {
+                    const { data: booking } = await supabase
+                        .from('bookings')
+                        .select('customer_phone, booking_details')
+                        .eq('id', contract.booking_id)
+                        .single()
+                    customerPhone = booking?.customer_phone || booking?.booking_details?.customer?.phone || ''
+                }
+
+                // For standalone documents, look up phone from customers_extended
+                if (!customerPhone && sigRequest.signer_email) {
+                    const { data: cust } = await supabase
+                        .from('customers_extended')
+                        .select('telefono')
+                        .eq('email', sigRequest.signer_email)
+                        .maybeSingle()
+                    customerPhone = cust?.telefono || ''
+                }
                 if (customerPhone) {
                     let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
                     if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
@@ -425,8 +418,8 @@ export const handler: Handler = async (event) => {
                         body: JSON.stringify({
                             chatId: `${cleanPhone}@c.us`,
                             urlFile: signedPdfUrl,
-                            fileName: `Contratto_Firmato_${contract.contract_number || ''}.pdf`,
-                            caption: `Contratto ${contract.contract_number || ''} firmato - DR7 Empire`
+                            fileName: `${docIdentifier}_firmato.pdf`,
+                            caption: `${contract ? 'Contratto' : 'Documento'} ${docIdentifier} firmato - DR7 Empire`
                         })
                     })
 

@@ -18,77 +18,21 @@ export default function FirmaPage() {
     const [signerName, setSignerName] = useState('')
     const [signerEmail, setSignerEmail] = useState('')
     const [contract, setContract] = useState<ContractInfo | null>(null)
+    const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null)
     const [signedAt, setSignedAt] = useState<string | null>(null)
     const [otp, setOtp] = useState(['', '', '', '', '', ''])
     const [error, setError] = useState('')
     const [remainingAttempts, setRemainingAttempts] = useState(5)
     const [acceptedTerms, setAcceptedTerms] = useState(false)
     const [acceptedMarketing, setAcceptedMarketing] = useState<boolean | null>(null)
+    const [existingMarketingConsent, setExistingMarketingConsent] = useState<boolean | null>(null)
     const [showMarketingInfo, setShowMarketingInfo] = useState(false)
     const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
     const otpRefs = useRef<(HTMLInputElement | null)[]>([])
-    const [pdfPages, setPdfPages] = useState<string[]>([])
-    const [pdfLoading, setPdfLoading] = useState(false)
 
     useEffect(() => {
         if (token) loadSigningData()
     }, [token])
-
-    // Render PDF pages as images using canvas for full multi-page display
-    useEffect(() => {
-        if (contract?.pdfUrl && status !== 'signed') {
-            renderPdfPages(contract.pdfUrl)
-        }
-    }, [contract?.pdfUrl, status])
-
-    async function renderPdfPages(url: string) {
-        setPdfLoading(true)
-        try {
-            // Use pdf.js via CDN to render pages as images
-            const pdfjsLib = await loadPdfJs()
-            const pdf = await pdfjsLib.getDocument(url).promise
-            const pages: string[] = []
-
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i)
-                const scale = 2 // High-res rendering
-                const viewport = page.getViewport({ scale })
-
-                const canvas = document.createElement('canvas')
-                canvas.width = viewport.width
-                canvas.height = viewport.height
-                const ctx = canvas.getContext('2d')!
-
-                await page.render({ canvasContext: ctx, viewport }).promise
-                pages.push(canvas.toDataURL('image/png'))
-            }
-
-            setPdfPages(pages)
-        } catch (err) {
-            console.error('Error rendering PDF:', err)
-            // Fallback: will use iframe
-            setPdfPages([])
-        } finally {
-            setPdfLoading(false)
-        }
-    }
-
-    async function loadPdfJs(): Promise<any> {
-        // Check if already loaded
-        if ((window as any).pdfjsLib) return (window as any).pdfjsLib
-
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script')
-            script.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js'
-            script.onload = () => {
-                const lib = (window as any).pdfjsLib
-                lib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js'
-                resolve(lib)
-            }
-            script.onerror = reject
-            document.head.appendChild(script)
-        })
-    }
 
     async function loadSigningData() {
         try {
@@ -114,9 +58,18 @@ export default function FirmaPage() {
             setSignerName(data.signerName)
             setSignerEmail(data.signerEmail)
             setContract(data.contract)
+            if (data.otpChannel) setOtpChannel(data.otpChannel)
+
+            // If customer already consented to marketing, pre-fill and skip the question
+            if (data.existingMarketingConsent === true) {
+                setExistingMarketingConsent(true)
+                setAcceptedMarketing(true)
+            } else {
+                setExistingMarketingConsent(data.existingMarketingConsent ?? null)
+            }
 
             if (data.status === 'signed') {
-    
+                setSignedPdfUrl(data.signedPdfUrl)
                 setSignedAt(data.signedAt)
                 setStatus('signed')
             } else {
@@ -147,6 +100,7 @@ export default function FirmaPage() {
 
             const data = await res.json()
             if (data.channel) setOtpChannel(data.channel)
+
             setStatus('otp_sent')
             setOtp(['', '', '', '', '', ''])
             setTimeout(() => otpRefs.current[0]?.focus(), 100)
@@ -195,8 +149,10 @@ export default function FirmaPage() {
             setError('Devi accettare i termini per procedere')
             return
         }
-        if (acceptedMarketing === null) {
-            setError('Devi selezionare Si o No per il consenso marketing')
+
+        // Only require a marketing answer if the customer hasn't already answered
+        if (acceptedMarketing === null && existingMarketingConsent === null) {
+            setError('Seleziona Si o No per le offerte Trustera')
             return
         }
 
@@ -215,7 +171,7 @@ export default function FirmaPage() {
             }
 
             const data = await res.json()
-
+            setSignedPdfUrl(data.signedPdfUrl)
             setSignedAt(data.signedAt)
             setStatus('signed')
         } catch {
@@ -289,84 +245,61 @@ export default function FirmaPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white text-gray-800 py-4 px-6 flex items-center justify-between shadow-sm border-b border-gray-200">
-                <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
-                <span className="text-sm text-green-700 font-medium">Firma Elettronica</span>
+            <div className="bg-black text-white py-4 px-6 flex items-center justify-between">
+                <img src="https://dr7empire.com/DR7logo1.png" alt="DR7" className="h-10" />
+                <span className="text-sm text-gray-400">Firma Elettronica</span>
             </div>
 
-            <div className="max-w-3xl mx-auto p-4 sm:p-6">
+            <div className="max-w-2xl mx-auto p-4 sm:p-6">
                 {/* Contract Info Card */}
                 {contract && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
                         <h1 className="text-xl font-bold text-gray-800 mb-1">
-                            Contratto {contract.contractNumber}
+                            {contract.vehicleName ? `Contratto ${contract.contractNumber}` : contract.contractNumber || 'Documento'}
                         </h1>
                         <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
                             <div>
                                 <span className="text-gray-500 block">Cliente</span>
                                 <span className="font-semibold">{signerName}</span>
                             </div>
-                            <div>
-                                <span className="text-gray-500 block">Veicolo</span>
-                                <span className="font-semibold">{contract.vehicleName}</span>
-                            </div>
-                            <div>
-                                <span className="text-gray-500 block">Ritiro</span>
-                                <span className="font-semibold">
-                                    {contract.rentalStartDate ? new Date(contract.rentalStartDate).toLocaleDateString('it-IT') : 'N/A'}
-                                </span>
-                            </div>
-                            <div>
-                                <span className="text-gray-500 block">Riconsegna</span>
-                                <span className="font-semibold">
-                                    {contract.rentalEndDate ? new Date(contract.rentalEndDate).toLocaleDateString('it-IT') : 'N/A'}
-                                </span>
-                            </div>
+                            {contract.vehicleName && (
+                                <div>
+                                    <span className="text-gray-500 block">Veicolo</span>
+                                    <span className="font-semibold">{contract.vehicleName}</span>
+                                </div>
+                            )}
+                            {contract.rentalStartDate && (
+                                <div>
+                                    <span className="text-gray-500 block">Ritiro</span>
+                                    <span className="font-semibold">
+                                        {new Date(contract.rentalStartDate).toLocaleDateString('it-IT')}
+                                    </span>
+                                </div>
+                            )}
+                            {contract.rentalEndDate && (
+                                <div>
+                                    <span className="text-gray-500 block">Riconsegna</span>
+                                    <span className="font-semibold">
+                                        {new Date(contract.rentalEndDate).toLocaleDateString('it-IT')}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
 
-                {/* PDF Viewer - Full multi-page display */}
+                {/* PDF Viewer */}
                 {contract?.pdfUrl && status !== 'signed' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-                        <div className="bg-gray-100 px-4 py-2 text-sm text-gray-600 font-medium border-b flex items-center justify-between">
-                            <span>Documento da firmare</span>
-                            {pdfPages.length > 0 && (
-                                <span className="text-xs text-gray-400">{pdfPages.length} pagine</span>
-                            )}
+                        <div className="bg-gray-100 px-4 py-2 text-sm text-gray-600 font-medium border-b">
+                            Documento da firmare
                         </div>
-
-                        {pdfLoading && (
-                            <div className="flex items-center justify-center py-16">
-                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mr-3"></div>
-                                <span className="text-gray-500">Caricamento documento...</span>
-                            </div>
-                        )}
-
-                        {pdfPages.length > 0 ? (
-                            <div className="p-4 space-y-4 bg-gray-200">
-                                {pdfPages.map((pageDataUrl, index) => (
-                                    <div key={index} className="relative">
-                                        <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                                            Pagina {index + 1} di {pdfPages.length}
-                                        </div>
-                                        <img
-                                            src={pageDataUrl}
-                                            alt={`Pagina ${index + 1}`}
-                                            className="w-full shadow-lg rounded"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        ) : !pdfLoading ? (
-                            /* Fallback: iframe with larger height */
-                            <iframe
-                                src={contract.pdfUrl}
-                                className="w-full border-0"
-                                style={{ height: '80vh', minHeight: '600px' }}
-                                title="Contratto PDF"
-                            />
-                        ) : null}
+                        <iframe
+                            src={contract.pdfUrl}
+                            className="w-full border-0"
+                            style={{ height: '500px' }}
+                            title="Contratto PDF"
+                        />
                     </div>
                 )}
 
@@ -382,7 +315,7 @@ export default function FirmaPage() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
                         <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Contratto</h2>
                         <p className="text-gray-600 text-sm mb-6">
-                            Per procedere con la firma, invieremo un codice di verifica via WhatsApp.
+                            Per procedere con la firma, invieremo un codice di verifica via WhatsApp o email.
                         </p>
                         <button
                             onClick={handleRequestOtp}
@@ -406,9 +339,8 @@ export default function FirmaPage() {
                         <h2 className="text-lg font-bold text-gray-800 mb-2 text-center">Inserisci Codice OTP</h2>
                         <p className="text-gray-600 text-sm mb-6 text-center">
                             {otpChannel === 'whatsapp'
-                                ? 'Codice inviato via WhatsApp.'
-                                : <>Abbiamo inviato un codice a 6 cifre a <strong>{signerEmail}</strong></>
-                            }
+                                ? 'Abbiamo inviato un codice a 6 cifre via WhatsApp.'
+                                : `Abbiamo inviato un codice a 6 cifre a ${signerEmail}`}
                         </p>
 
                         <div className="flex justify-center gap-2 mb-6" onPaste={handleOtpPaste}>
@@ -464,7 +396,7 @@ export default function FirmaPage() {
 
                         <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm text-gray-700">
                             <p className="mb-2">
-                                Io, <strong>{signerName}</strong>, dichiaro di aver preso visione del contratto
+                                Io, <strong>{signerName}</strong>, dichiaro di aver preso visione del documento
                                 {contract?.contractNumber ? ` n. ${contract.contractNumber}` : ''} e di approvarne
                                 integralmente il contenuto.
                             </p>
@@ -482,48 +414,49 @@ export default function FirmaPage() {
                                 className="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                             />
                             <span className="text-sm text-gray-700">
-                                Accetto i termini e le condizioni del contratto e confermo la mia volonta di firmare
-                                elettronicamente questo documento.
+                                Confermo che i dati inseriti sono corretti e accetto i termini e le condizioni del contratto.
                             </span>
                         </label>
 
-                        <div className="mb-6">
-                            <p className="text-sm text-gray-700 mb-3">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowMarketingInfo(true)}
-                                    className="underline text-yellow-700 hover:text-yellow-800 transition-colors text-left"
-                                >
-                                    Accetto vantaggi, offerte e sconti dedicati da Trustera e partner.
-                                </button>
-                            </p>
-                            <div className="flex gap-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="marketing"
-                                        checked={acceptedMarketing === true}
-                                        onChange={() => setAcceptedMarketing(true)}
-                                        className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
-                                    />
-                                    <span className="text-sm font-medium text-gray-700">Si</span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="marketing"
-                                        checked={acceptedMarketing === false}
-                                        onChange={() => setAcceptedMarketing(false)}
-                                        className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
-                                    />
-                                    <span className="text-sm font-medium text-gray-700">No</span>
-                                </label>
+                        {existingMarketingConsent !== true && (
+                            <div className="mb-6">
+                                <p className="text-sm text-gray-700 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMarketingInfo(true)}
+                                        className="underline text-yellow-700 hover:text-yellow-800 transition-colors"
+                                    >
+                                        Accetto vantaggi, offerte e sconti dedicati da Trustera e partner.
+                                    </button>
+                                </p>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="marketing"
+                                            checked={acceptedMarketing === true}
+                                            onChange={() => setAcceptedMarketing(true)}
+                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Si</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="marketing"
+                                            checked={acceptedMarketing === false}
+                                            onChange={() => setAcceptedMarketing(false)}
+                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">No</span>
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         <button
                             onClick={handleSign}
-                            disabled={!acceptedTerms || acceptedMarketing === null}
+                            disabled={!acceptedTerms || (existingMarketingConsent !== true && acceptedMarketing === null)}
                             className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg"
                         >
                             Firma il Documento
@@ -543,6 +476,16 @@ export default function FirmaPage() {
                         <p className="text-gray-500 text-sm mb-6">
                             Riceverai una copia del contratto firmato via WhatsApp.
                         </p>
+                        {signedPdfUrl && (
+                            <a
+                                href={signedPdfUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
+                            >
+                                Scarica Contratto Firmato
+                            </a>
+                        )}
                     </div>
                 )}
             </div>
@@ -552,26 +495,24 @@ export default function FirmaPage() {
                 Dubai rent 7.0 S.p.A. - Via del Fangario 25, 09122 Cagliari (CA) - P.IVA 04104640927
             </div>
 
-            {/* Marketing Informativa Modal */}
+            {/* Marketing Info Modal */}
             {showMarketingInfo && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6">
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">Informativa Marketing</h3>
-                        <div className="text-sm text-gray-600 space-y-3">
-                            <p>
-                                Ai sensi del Regolamento UE 2016/679 (GDPR), il tuo consenso ci autorizza a inviarti
-                                comunicazioni promozionali relative a offerte, sconti e vantaggi dedicati da parte di
-                                Trustera e dei suoi partner commerciali.
-                            </p>
-                            <p>
-                                Le comunicazioni potranno essere inviate tramite WhatsApp, email o SMS.
-                                Potrai revocare il consenso in qualsiasi momento contattandoci all'indirizzo
-                                privacy@trustera360.app o tramite il link di disiscrizione presente in ogni comunicazione.
-                            </p>
-                            <p>
-                                I tuoi dati non saranno ceduti a terzi senza il tuo esplicito consenso e saranno
-                                trattati nel rispetto della normativa vigente.
-                            </p>
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowMarketingInfo(false)}>
+                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-gray-800 mb-4">
+                            INFORMATIVA SUL TRATTAMENTO DEI DATI PERSONALI PER FINALITA DI MARKETING
+                        </h3>
+                        <div className="text-sm text-gray-700 space-y-3">
+                            <p>Ai sensi del Regolamento (UE) 2016/679 ("GDPR"), previo consenso dell'utente, Trustera potra trattare i dati personali forniti durante l'utilizzo della piattaforma (quali ad esempio dati identificativi e di contatto) per finalita di marketing e comunicazioni commerciali.</p>
+                            <p>I dati potranno essere utilizzati per l'invio di vantaggi, offerte, promozioni e sconti dedicati relativi a prodotti o servizi che potrebbero essere di interesse per l'utente.</p>
+                            <p>Le comunicazioni potranno essere effettuate tramite diversi canali di contatto, tra cui, a titolo esemplificativo: email, SMS, telefono, notifiche push, applicazioni di messaggistica (come ad esempio WhatsApp) e altri strumenti di comunicazione elettronica o digitale.</p>
+                            <p>Previo consenso dell'utente, i dati potranno essere trattati da Trustera, partner selezionati, e resi disponibili anche attraverso DR7 Platform, una piattaforma digitale utilizzata per la gestione e la distribuzione di opportunita commerciali e offerte da parte di aziende e partner aderenti.</p>
+                            <p>Attraverso DR7 Platform, i dati potranno essere utilizzati da partner commerciali selezionati presenti sulla piattaforma, al fine di proporre comunicazioni commerciali, offerte, promozioni, vantaggi e sconti dedicati.</p>
+                            <p>Tali partner possono appartenere a diverse categorie merceologiche e settori economici, inclusi, a titolo esemplificativo ma non esaustivo, aziende operanti nei settori retail e beni di consumo, moda e abbigliamento, e-commerce, servizi digitali e tecnologici, telecomunicazioni, mobilita, turismo, energia, assicurazioni, servizi finanziari, servizi professionali, casa, benessere, tempo libero e altri prodotti o servizi potenzialmente di interesse per l'utente.</p>
+                            <p>Il consenso al trattamento dei dati per finalita di marketing e facoltativo e non e necessario per l'utilizzo delle funzionalita principali della piattaforma.</p>
+                            <p>L'utente puo revocare in qualsiasi momento il consenso prestato tramite i link di disiscrizione presenti nelle comunicazioni ricevute oppure attraverso i canali indicati nella privacy policy generale.</p>
+                            <p>Trustera conserva evidenza del consenso prestato, inclusi data, ora e log tecnici associati alla manifestazione di volonta dell'utente, al fine di dimostrare la liceita del trattamento.</p>
+                            <p>L'utente puo esercitare in qualsiasi momento i diritti previsti dagli articoli 15-22 del GDPR, tra cui accesso ai dati personali, rettifica, cancellazione, limitazione del trattamento, opposizione e portabilita dei dati.</p>
                         </div>
                         <button
                             onClick={() => setShowMarketingInfo(false)}

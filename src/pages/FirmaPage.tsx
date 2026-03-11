@@ -298,7 +298,7 @@ export default function FirmaPage() {
                             </a>
                         </div>
                         <iframe
-                            src={contract.pdfUrl}
+                            src={`https://docs.google.com/gview?url=${encodeURIComponent(contract.pdfUrl)}&embedded=true`}
                             className="w-full border-0"
                             style={{ height: '70vh', minHeight: '500px' }}
                             title="Documento PDF"

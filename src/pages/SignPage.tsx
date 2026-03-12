@@ -175,10 +175,15 @@ export default function SignPage() {
           <p className="text-sm text-gray-500">Firmatario: {signerName}</p>
         </div>
 
-        {/* PDF viewer */}
+        {/* PDF viewer — Google Docs Viewer for full multi-page support */}
         {pdfUrl && status !== 'signed' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <iframe src={pdfUrl} className="w-full border-0" style={{ height: '500px' }} title="Documento" />
+            <iframe
+              src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
+              className="w-full border-0"
+              style={{ height: '70vh', minHeight: '500px' }}
+              title="Documento"
+            />
           </div>
         )}
 

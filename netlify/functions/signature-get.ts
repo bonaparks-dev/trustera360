@@ -68,14 +68,21 @@ export const handler: Handler = async (event) => {
                 // Look up existing marketing consent from customers_extended
                 const customerEmail = booking?.customer_email || booking?.booking_details?.customer?.email
                 if (customerEmail) {
-                    const { data: extCustomer } = await supabase
+                    // Use .limit(1) instead of .maybeSingle() to avoid error when multiple rows exist
+                    const { data: extRows, error: extErr } = await supabase
                         .from('customers_extended')
                         .select('marketing_consent')
-                        .ilike('email', customerEmail)
-                        .maybeSingle()
+                        .ilike('email', customerEmail.trim())
+                        .limit(1)
 
-                    if (extCustomer) {
-                        existingMarketingConsent = extCustomer.marketing_consent ?? null
+                    if (extErr) {
+                        console.error(`[signature-get] Error looking up consent for ${customerEmail}:`, extErr.message)
+                    }
+                    if (extRows && extRows.length > 0) {
+                        existingMarketingConsent = extRows[0].marketing_consent ?? null
+                        console.log(`[signature-get] Found consent=${existingMarketingConsent} for booking email ${customerEmail}`)
+                    } else {
+                        console.log(`[signature-get] No customers_extended row for booking email ${customerEmail}`)
                     }
                 }
             }
@@ -83,15 +90,48 @@ export const handler: Handler = async (event) => {
 
         // Fallback: always try signer_email if consent still unknown
         if (existingMarketingConsent === null && sigRequest.signer_email) {
-            const { data: extCustomer } = await supabase
+            const { data: extRows } = await supabase
                 .from('customers_extended')
                 .select('marketing_consent')
-                .ilike('email', sigRequest.signer_email)
-                .maybeSingle()
-            if (extCustomer) {
-                existingMarketingConsent = extCustomer.marketing_consent ?? null
+                .ilike('email', sigRequest.signer_email.trim())
+                .limit(1)
+            if (extRows && extRows.length > 0) {
+                existingMarketingConsent = extRows[0].marketing_consent ?? null
+                console.log(`[signature-get] Found consent=${existingMarketingConsent} for signer email ${sigRequest.signer_email}`)
             }
         }
+
+        // Last resort: check audit trail for any previous signing by this signer with marketing_consent=true
+        if (existingMarketingConsent === null && sigRequest.signer_email) {
+            // Find previous signature_requests by this email that have been signed
+            const { data: prevSignRequests } = await supabase
+                .from('signature_requests')
+                .select('id')
+                .ilike('signer_email', sigRequest.signer_email)
+                .eq('status', 'signed')
+                .neq('id', sigRequest.id)
+
+            if (prevSignRequests && prevSignRequests.length > 0) {
+                const ids = prevSignRequests.map((r: any) => r.id)
+                const { data: auditRows } = await supabase
+                    .from('signature_audit_trail')
+                    .select('metadata')
+                    .eq('event_type', 'document_signed')
+                    .in('signature_request_id', ids)
+                    .order('created_at', { ascending: false })
+                    .limit(10)
+
+                if (auditRows) {
+                    const found = auditRows.find((row: any) => row.metadata?.marketing_consent === true)
+                    if (found) {
+                        existingMarketingConsent = true
+                        console.log(`[signature-get] Found marketing consent=true in audit trail for ${sigRequest.signer_email}`)
+                    }
+                }
+            }
+        }
+
+        console.log(`[signature-get] Marketing consent for ${sigRequest.signer_email}: ${existingMarketingConsent}`)
 
         // Log document view
         if (sigRequest.status !== 'signed') {

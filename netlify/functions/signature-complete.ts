@@ -378,7 +378,15 @@ export const handler: Handler = async (event) => {
                             .ilike('email', customerEmail)
                         console.log(`[signature-complete] Marketing consent (${marketingConsent}) saved for ${customerEmail}`)
                     } else if (!existingCustomer) {
-                        console.log(`[signature-complete] No customer_extended record for ${customerEmail} — consent not saved`)
+                        // CREATE the row so consent is persisted for future signings
+                        await supabase
+                            .from('customers_extended')
+                            .insert({
+                                email: customerEmail.toLowerCase(),
+                                marketing_consent: !!marketingConsent,
+                                marketing_consent_date: signedAt.toISOString()
+                            })
+                        console.log(`[signature-complete] Created customers_extended record for ${customerEmail} with marketing_consent=${!!marketingConsent}`)
                     } else {
                         console.log(`[signature-complete] Skipping consent update for ${customerEmail}: existing=true, new=false — kept as true`)
                     }

@@ -14,20 +14,26 @@ interface Document {
   pdf_url: string
   signed_pdf_url?: string
   signed_at?: string
+  owner_id?: string
 }
+
+type Tab = 'sent' | 'signed_by_me'
 
 export default function DashboardPage({ session }: { session: Session }) {
   const navigate = useNavigate()
-  const [documents, setDocuments] = useState<Document[]>([])
+  const [sentDocuments, setSentDocuments] = useState<Document[]>([])
+  const [signedByMeDocuments, setSignedByMeDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [signerName, setSignerName] = useState('')
   const [signerEmail, setSignerEmail] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [activeTab, setActiveTab] = useState<Tab>('sent')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const userName = session.user.user_metadata?.full_name || session.user.email || 'Utente'
+  const userEmail = session.user.email || ''
 
   useEffect(() => {
     loadDocuments()
@@ -35,32 +41,54 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function loadDocuments() {
     setLoading(true)
-    const { data, error } = await supabase
+
+    const getSignedUrl = async (url: string | null) => {
+      if (!url) return url
+      const match = url.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
+      if (!match) return url
+      const { data: signed } = await supabase.storage.from('trustera').createSignedUrl(match[1], 3600)
+      return signed?.signedUrl || url
+    }
+
+    const processDocUrls = async (docs: any[]) => {
+      return Promise.all(docs.map(async (doc: any) => ({
+        ...doc,
+        pdf_url: await getSignedUrl(doc.pdf_url),
+        signed_pdf_url: await getSignedUrl(doc.signed_pdf_url)
+      })))
+    }
+
+    // Load sent documents (owned by user)
+    const sentPromise = supabase
       .from('trustera_documents')
       .select('*')
       .eq('owner_id', session.user.id)
       .order('created_at', { ascending: false })
 
-    if (error) {
-      console.error('Error loading documents:', error)
+    // Load documents signed by me (where I'm the signer)
+    const signedByMePromise = supabase
+      .from('trustera_documents')
+      .select('*')
+      .eq('signer_email', userEmail)
+      .eq('status', 'signed')
+      .order('signed_at', { ascending: false })
+
+    const [sentResult, signedResult] = await Promise.all([sentPromise, signedByMePromise])
+
+    if (sentResult.error) {
+      console.error('Error loading sent documents:', sentResult.error)
     } else {
-      // Generate signed URLs for PDFs (public URLs fail if bucket isn't public)
-      const docs = await Promise.all((data || []).map(async (doc: any) => {
-        const getSignedUrl = async (url: string | null) => {
-          if (!url) return url
-          const match = url.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
-          if (!match) return url
-          const { data: signed } = await supabase.storage.from('trustera').createSignedUrl(match[1], 3600)
-          return signed?.signedUrl || url
-        }
-        return {
-          ...doc,
-          pdf_url: await getSignedUrl(doc.pdf_url),
-          signed_pdf_url: await getSignedUrl(doc.signed_pdf_url)
-        }
-      }))
-      setDocuments(docs)
+      setSentDocuments(await processDocUrls(sentResult.data || []))
     }
+
+    if (signedResult.error) {
+      console.error('Error loading signed documents:', signedResult.error)
+    } else {
+      // Filter out documents I own (to avoid duplicates)
+      const externalDocs = (signedResult.data || []).filter((d: any) => d.owner_id !== session.user.id)
+      setSignedByMeDocuments(await processDocUrls(externalDocs))
+    }
+
     setLoading(false)
   }
 
@@ -70,7 +98,6 @@ export default function DashboardPage({ session }: { session: Session }) {
 
     setUploading(true)
     try {
-      // Upload PDF to storage
       const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
       const { error: uploadError } = await supabase.storage
         .from('trustera')
@@ -80,7 +107,6 @@ export default function DashboardPage({ session }: { session: Session }) {
 
       const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
 
-      // Create document record
       const { data: doc, error: insertError } = await supabase
         .from('trustera_documents')
         .insert({
@@ -96,7 +122,6 @@ export default function DashboardPage({ session }: { session: Session }) {
 
       if (insertError) throw insertError
 
-      // Send signing request via Netlify function
       const res = await fetch('/.netlify/functions/trustera-send-signing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -138,6 +163,13 @@ export default function DashboardPage({ session }: { session: Session }) {
     signed: 'Firmato',
   }
 
+  const totalSent = sentDocuments.length
+  const pendingCount = sentDocuments.filter(d => d.status === 'pending').length
+  const signedSentCount = sentDocuments.filter(d => d.status === 'signed').length
+  const signedByMeCount = signedByMeDocuments.length
+
+  const activeDocuments = activeTab === 'sent' ? sentDocuments : signedByMeDocuments
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -160,15 +192,58 @@ export default function DashboardPage({ session }: { session: Session }) {
       </header>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Actions */}
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-2xl font-bold text-gray-800">I miei documenti</h1>
-          <button
-            onClick={() => setShowUploadModal(true)}
-            className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-          >
-            + Nuovo Documento
-          </button>
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500 mb-1">Documenti inviati</p>
+            <p className="text-2xl font-bold text-gray-800">{totalSent}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500 mb-1">In attesa di firma</p>
+            <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500 mb-1">Firmati (inviati)</p>
+            <p className="text-2xl font-bold text-green-600">{signedSentCount}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500 mb-1">Firmati da me</p>
+            <p className="text-2xl font-bold text-green-600">{signedByMeCount}</p>
+          </div>
+        </div>
+
+        {/* Tabs + Action */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setActiveTab('sent')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                activeTab === 'sent'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Inviati ({totalSent})
+            </button>
+            <button
+              onClick={() => setActiveTab('signed_by_me')}
+              className={`px-5 py-2 rounded-md text-sm font-semibold transition-colors ${
+                activeTab === 'signed_by_me'
+                  ? 'bg-white text-gray-800 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Firmati da me ({signedByMeCount})
+            </button>
+          </div>
+          {activeTab === 'sent' && (
+            <button
+              onClick={() => setShowUploadModal(true)}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+            >
+              + Nuovo Documento
+            </button>
+          )}
         </div>
 
         {/* Documents List */}
@@ -176,19 +251,25 @@ export default function DashboardPage({ session }: { session: Session }) {
           <div className="text-center py-16">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600 mx-auto"></div>
           </div>
-        ) : documents.length === 0 ? (
+        ) : activeDocuments.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-            <p className="text-gray-400 text-lg mb-4">Nessun documento</p>
-            <button
-              onClick={() => setShowUploadModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
-            >
-              Carica il primo documento
-            </button>
+            {activeTab === 'sent' ? (
+              <>
+                <p className="text-gray-400 text-lg mb-4">Nessun documento inviato</p>
+                <button
+                  onClick={() => setShowUploadModal(true)}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Carica il primo documento
+                </button>
+              </>
+            ) : (
+              <p className="text-gray-400 text-lg">Nessun documento firmato da te</p>
+            )}
           </div>
         ) : (
           <div className="grid gap-4">
-            {documents.map(doc => (
+            {activeDocuments.map(doc => (
               <div key={doc.id} className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-1">
@@ -197,16 +278,27 @@ export default function DashboardPage({ session }: { session: Session }) {
                       {statusLabels[doc.status]}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500">
-                    Firmatario: {doc.signer_name} ({doc.signer_email})
-                  </p>
+                  {activeTab === 'sent' ? (
+                    <p className="text-sm text-gray-500">
+                      Firmatario: {doc.signer_name} ({doc.signer_email})
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500">
+                      Richiesto da un altro utente
+                    </p>
+                  )}
                   <p className="text-xs text-gray-400 mt-1">
-                    {new Date(doc.created_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}
-                    {doc.signed_at && ` — Firmato il ${new Date(doc.signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`}
+                    {activeTab === 'sent'
+                      ? new Date(doc.created_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+                      : doc.signed_at
+                        ? `Firmato il ${new Date(doc.signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`
+                        : new Date(doc.created_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+                    }
+                    {activeTab === 'sent' && doc.signed_at && ` — Firmato il ${new Date(doc.signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`}
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  {doc.pdf_url && (
+                  {(doc.signed_pdf_url || doc.pdf_url) && (
                     <a
                       href={doc.signed_pdf_url || doc.pdf_url}
                       target="_blank"

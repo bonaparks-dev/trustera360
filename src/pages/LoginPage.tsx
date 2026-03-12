@@ -1,15 +1,26 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('verified') === 'true') {
+      toast.success('Email confermata! Ora puoi accedere.')
+    }
+    const error = searchParams.get('error')
+    if (error) {
+      toast.error(error)
+    }
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -17,16 +28,31 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: fullName } }
+        // Use our Netlify function that sends branded email via Resend
+        const res = await fetch('/.netlify/functions/trustera-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, fullName })
         })
-        if (error) throw error
+
+        const data = await res.json()
+
+        if (!res.ok) {
+          throw new Error(data.error || 'Errore nella registrazione')
+        }
+
         toast.success('Account creato! Controlla la tua email per confermare.')
+        setIsSignUp(false)
+        setPassword('')
+        setFullName('')
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) throw error
+        if (error) {
+          if (error.message === 'Email not confirmed') {
+            throw new Error('Email non confermata. Controlla la tua casella di posta.')
+          }
+          throw error
+        }
         navigate('/dashboard')
       }
     } catch (error: any) {

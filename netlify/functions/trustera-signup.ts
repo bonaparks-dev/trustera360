@@ -88,7 +88,7 @@ export const handler: Handler = async (event) => {
         const resend = new Resend(resendApiKey)
 
         const { error: emailError } = await resend.emails.send({
-            from: 'Trustera <noreply@trustera360.app>',
+            from: 'Trustera <info@trustera360.app>',
             to: email,
             subject: 'Conferma il tuo account Trustera',
             html: `

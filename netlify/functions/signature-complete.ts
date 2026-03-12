@@ -50,6 +50,19 @@ export const handler: Handler = async (event) => {
             return { statusCode: 410, body: JSON.stringify({ error: 'Il link di firma e scaduto' }) }
         }
 
+        // Look up which channel was used for OTP (WhatsApp or email) from audit trail
+        let otpChannel: 'whatsapp' | 'email' = 'email'
+        const { data: otpAudit } = await supabase
+            .from('signature_audit_trail')
+            .select('metadata')
+            .eq('signature_request_id', sigRequest.id)
+            .eq('event_type', 'otp_sent')
+            .order('created_at', { ascending: false })
+            .limit(1)
+        if (otpAudit && otpAudit.length > 0 && otpAudit[0].metadata?.channel) {
+            otpChannel = otpAudit[0].metadata.channel
+        }
+
         // Fetch original document — either from contract or standalone document
         let contract: any = null
         let pdfUrl: string | null = null
@@ -220,8 +233,10 @@ export const handler: Handler = async (event) => {
         y -= 20
 
         const verifyLines = [
-            ['Metodo:', signatureImage ? 'Firma Elettronica Avanzata via OTP Email + Firma Autografa' : 'Firma Elettronica Avanzata via OTP Email'],
-            ['Email OTP:', sigRequest.signer_email],
+            ['Metodo:', signatureImage
+                ? `Firma Elettronica Avanzata via OTP ${otpChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} + Firma Autografa`
+                : `Firma Elettronica Avanzata via OTP ${otpChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`],
+            [otpChannel === 'whatsapp' ? 'WhatsApp OTP:' : 'Email OTP:', otpChannel === 'whatsapp' ? (sigRequest.signer_name || sigRequest.signer_email) : sigRequest.signer_email],
             ['IP firmatario:', ipAddress],
             ['User Agent:', (userAgent || '').substring(0, 70)],
             ['Hash SHA-256:', currentHash.substring(0, 32) + '...'],
@@ -243,7 +258,7 @@ export const handler: Handler = async (event) => {
             `contratto sopra indicato e di approvarne integralmente il contenuto.`,
             ``,
             `La firma e stata apposta tramite verifica dell'identita via codice OTP`,
-            `inviato all'indirizzo email ${sigRequest.signer_email}, in conformita`,
+            `inviato via ${otpChannel === 'whatsapp' ? 'WhatsApp' : `email a ${sigRequest.signer_email}`}, in conformita`,
             `con il Regolamento eIDAS (UE) n. 910/2014 e il CAD (D.Lgs. 82/2005).`,
             ``,
             `Il presente documento e stato firmato elettronicamente e qualsiasi`,

@@ -76,9 +76,11 @@ export const handler: Handler = async (event) => {
             })
             .eq('id', sigRequest.id)
 
-        // Try to get customer phone from booking
-        let customerPhone = ''
-        if (sigRequest.booking_id) {
+        // Try signer_phone stored directly on the request first
+        let customerPhone = sigRequest.signer_phone || ''
+
+        // Then try booking
+        if (!customerPhone && sigRequest.booking_id) {
             const { data: booking } = await supabase
                 .from('bookings')
                 .select('customer_phone, booking_details')

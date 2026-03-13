@@ -116,6 +116,7 @@ export const handler: Handler = async (event) => {
         const pdfDoc = await PDFDocument.load(originalPdfBytes)
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+        const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
 
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
@@ -157,37 +158,57 @@ export const handler: Handler = async (event) => {
                 pg.drawLine({ start: { x: bx, y: by + r }, end: { x: bx, y: by + bh - r }, thickness: 1, color: borderColor })
                 pg.drawLine({ start: { x: bx + bw, y: by + r }, end: { x: bx + bw, y: by + bh - r }, thickness: 1, color: borderColor })
 
-                // Signer name centered in box
+                // Signer name in italic, centered in box
                 const nameSize = 14
-                const nameWidth = fontBold.widthOfTextAtSize(signerName, nameSize)
+                const nameWidth = fontItalic.widthOfTextAtSize(signerName, nameSize)
                 pg.drawText(signerName, {
                     x: bx + (bw - nameWidth) / 2,
                     y: by + bh / 2 + 2,
                     size: nameSize,
-                    font: fontBold,
+                    font: fontItalic,
                     color: rgb(0, 0, 0),
                 })
 
-                // Trustera logo below the box
+                // "——— ✓ Certificato da [logo] ———" between lines below the box
+                const certY = by - 12
+                const certText = 'Certificato da'
+                const certSize = 7
+                const checkText = '\u2713'
+                const checkWidth = font.widthOfTextAtSize(checkText, certSize)
+                const certTextWidth = font.widthOfTextAtSize(certText, certSize)
+                const logoDisplayW = logoImage ? 40 : 0
+                const logoDisplayH = logoImage ? (40 * logoH / logoW) : 0
+                const gap = 3
+                const totalContentWidth = checkWidth + gap + certTextWidth + gap + logoDisplayW
+                const lineLength = (bw - totalContentWidth - 20) / 2
+                const lineColor = rgb(0.75, 0.75, 0.75)
+                const startX = bx + (bw - totalContentWidth - lineLength * 2 - 20) / 2
+
+                // Left line
+                pg.drawLine({ start: { x: startX, y: certY }, end: { x: startX + lineLength, y: certY }, thickness: 0.5, color: lineColor })
+
+                let cx = startX + lineLength + 5
+                // Checkmark
+                pg.drawText(checkText, { x: cx, y: certY - 3, size: certSize, font, color: rgb(0.5, 0.5, 0.5) })
+                cx += checkWidth + gap
+
+                // "Certificato da" text
+                pg.drawText(certText, { x: cx, y: certY - 3, size: certSize, font, color: rgb(0.5, 0.5, 0.5) })
+                cx += certTextWidth + gap
+
+                // Trustera logo inline
                 if (logoImage) {
                     pg.drawImage(logoImage, {
-                        x: bx + (bw - logoW) / 2,
-                        y: by - logoH - 5,
-                        width: logoW,
-                        height: logoH,
+                        x: cx,
+                        y: certY - logoDisplayH / 2,
+                        width: logoDisplayW,
+                        height: logoDisplayH,
                     })
-                } else {
-                    const certText = 'Certificato da Trustera'
-                    const certSize = 7
-                    const certWidth = font.widthOfTextAtSize(certText, certSize)
-                    pg.drawText(certText, {
-                        x: bx + (bw - certWidth) / 2,
-                        y: by - 10,
-                        size: certSize,
-                        font,
-                        color: rgb(0.5, 0.5, 0.5),
-                    })
+                    cx += logoDisplayW + 5
                 }
+
+                // Right line
+                pg.drawLine({ start: { x: cx, y: certY }, end: { x: cx + lineLength, y: certY }, thickness: 0.5, color: lineColor })
             }
 
             console.log(`[signature-complete] Signature box with name embedded on ${allPages.length} pages for: ${signerName}`)

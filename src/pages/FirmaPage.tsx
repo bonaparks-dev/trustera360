@@ -468,7 +468,7 @@ export default function FirmaPage() {
                         <h2 className="text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
                         <p className="text-gray-600 mb-2">
                             Il documento e stato firmato con successo
-                            {signedAt ? ` il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : ''}.
+                            {signedAt && !isNaN(new Date(signedAt).getTime()) ? ` il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : ''}.
                         </p>
                         <p className="text-gray-500 text-sm mb-6">
                             Riceverai una copia del documento firmato via WhatsApp.

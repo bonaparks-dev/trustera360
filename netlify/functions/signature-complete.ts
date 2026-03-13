@@ -173,8 +173,8 @@ export const handler: Handler = async (event) => {
                 const certY = by - 12
                 const certText = 'Certificato da'
                 const certSize = 7
-                const checkText = 'v'
-                const checkWidth = font.widthOfTextAtSize(checkText, certSize)
+                const checkText = ''
+                const checkWidth = 0
                 const certTextWidth = font.widthOfTextAtSize(certText, certSize)
                 const logoDisplayW = logoImage ? 40 : 0
                 const logoDisplayH = logoImage ? (40 * logoH / logoW) : 0
@@ -188,9 +188,7 @@ export const handler: Handler = async (event) => {
                 pg.drawLine({ start: { x: startX, y: certY }, end: { x: startX + lineLength, y: certY }, thickness: 0.5, color: lineColor })
 
                 let cx = startX + lineLength + 5
-                // Checkmark
-                pg.drawText(checkText, { x: cx, y: certY - 3, size: certSize, font, color: rgb(0.5, 0.5, 0.5) })
-                cx += checkWidth + gap
+                // (checkmark removed)
 
                 // "Certificato da" text
                 pg.drawText(certText, { x: cx, y: certY - 3, size: certSize, font, color: rgb(0.5, 0.5, 0.5) })

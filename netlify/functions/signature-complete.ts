@@ -416,9 +416,9 @@ export const handler: Handler = async (event) => {
         const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
         if (GREEN_API_INSTANCE_ID && GREEN_API_TOKEN && signedPdfUrl) {
             try {
-                let customerPhone = ''
+                let customerPhone = sigRequest.signer_phone || ''
 
-                if (contract?.booking_id) {
+                if (!customerPhone && contract?.booking_id) {
                     const { data: booking } = await supabase
                         .from('bookings')
                         .select('customer_phone, booking_details')

@@ -120,75 +120,77 @@ export const handler: Handler = async (event) => {
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 
-        // Embed typed signature (name in rounded box + Certificato da Trustera) on last page
+        // Embed typed signature (name in rounded box + Trustera logo) on ALL pages
         {
-            const pages = pdfDoc.getPages()
-            const lastPage = pages[pages.length - 1]
-            const { width: pageWidth } = lastPage.getSize()
+            const allPages = pdfDoc.getPages()
             const signerName = sigRequest.signer_name || 'N/A'
 
-            // Box dimensions
-            const boxWidth = 200
-            const boxHeight = 60
-            const boxX = pageWidth * 0.35 + (160 - boxWidth) / 2 + 20
-            const boxY = 30
-            const borderRadius = 6
-            const borderColor = rgb(0.75, 0.75, 0.75)
-
-            // Draw rounded rectangle border (approximated with lines + corners)
-            const r = borderRadius
-            const bx = boxX
-            const by = boxY
-            const bw = boxWidth
-            const bh = boxHeight
-            // Top line
-            lastPage.drawLine({ start: { x: bx + r, y: by + bh }, end: { x: bx + bw - r, y: by + bh }, thickness: 1, color: borderColor })
-            // Bottom line
-            lastPage.drawLine({ start: { x: bx + r, y: by }, end: { x: bx + bw - r, y: by }, thickness: 1, color: borderColor })
-            // Left line
-            lastPage.drawLine({ start: { x: bx, y: by + r }, end: { x: bx, y: by + bh - r }, thickness: 1, color: borderColor })
-            // Right line
-            lastPage.drawLine({ start: { x: bx + bw, y: by + r }, end: { x: bx + bw, y: by + bh - r }, thickness: 1, color: borderColor })
-
-            // Signer name centered in box
-            const nameSize = 14
-            const nameWidth = fontBold.widthOfTextAtSize(signerName, nameSize)
-            lastPage.drawText(signerName, {
-                x: bx + (bw - nameWidth) / 2,
-                y: by + bh / 2 + 2,
-                size: nameSize,
-                font: fontBold,
-                color: rgb(0, 0, 0),
-            })
-
-            // Trustera logo below the box
+            // Embed logo once, reuse on all pages
+            let logoImage: any = null
+            let logoW = 0, logoH = 0
             try {
                 const logoBytes = Uint8Array.from(atob(TRUSTERA_LOGO_BASE64), c => c.charCodeAt(0))
-                const logoImage = await pdfDoc.embedJpg(logoBytes)
+                logoImage = await pdfDoc.embedJpg(logoBytes)
                 const logoMaxWidth = 80
                 const logoScale = logoMaxWidth / logoImage.width
-                const logoW = logoImage.width * logoScale
-                const logoH = logoImage.height * logoScale
-                lastPage.drawImage(logoImage, {
-                    x: bx + (bw - logoW) / 2,
-                    y: by - logoH - 5,
-                    width: logoW,
-                    height: logoH,
-                })
+                logoW = logoImage.width * logoScale
+                logoH = logoImage.height * logoScale
             } catch (logoErr: any) {
-                // Fallback to text if logo fails
-                const certText = 'Certificato da Trustera'
-                const certSize = 7
-                const certWidth = font.widthOfTextAtSize(certText, certSize)
-                lastPage.drawText(certText, {
-                    x: bx + (bw - certWidth) / 2,
-                    y: by - 10,
-                    size: certSize,
-                    font,
-                    color: rgb(0.5, 0.5, 0.5),
-                })
-                console.error('[signature-complete] Failed to embed logo:', logoErr.message)
+                console.error('[signature-complete] Failed to load logo:', logoErr.message)
             }
+
+            for (const pg of allPages) {
+                const { width: pageWidth } = pg.getSize()
+
+                // Box dimensions
+                const boxWidth = 200
+                const boxHeight = 60
+                const boxX = pageWidth * 0.35 + (160 - boxWidth) / 2 + 20
+                const boxY = 30
+                const r = 6
+                const borderColor = rgb(0.75, 0.75, 0.75)
+                const bx = boxX, by = boxY, bw = boxWidth, bh = boxHeight
+
+                // Rounded rectangle border
+                pg.drawLine({ start: { x: bx + r, y: by + bh }, end: { x: bx + bw - r, y: by + bh }, thickness: 1, color: borderColor })
+                pg.drawLine({ start: { x: bx + r, y: by }, end: { x: bx + bw - r, y: by }, thickness: 1, color: borderColor })
+                pg.drawLine({ start: { x: bx, y: by + r }, end: { x: bx, y: by + bh - r }, thickness: 1, color: borderColor })
+                pg.drawLine({ start: { x: bx + bw, y: by + r }, end: { x: bx + bw, y: by + bh - r }, thickness: 1, color: borderColor })
+
+                // Signer name centered in box
+                const nameSize = 14
+                const nameWidth = fontBold.widthOfTextAtSize(signerName, nameSize)
+                pg.drawText(signerName, {
+                    x: bx + (bw - nameWidth) / 2,
+                    y: by + bh / 2 + 2,
+                    size: nameSize,
+                    font: fontBold,
+                    color: rgb(0, 0, 0),
+                })
+
+                // Trustera logo below the box
+                if (logoImage) {
+                    pg.drawImage(logoImage, {
+                        x: bx + (bw - logoW) / 2,
+                        y: by - logoH - 5,
+                        width: logoW,
+                        height: logoH,
+                    })
+                } else {
+                    const certText = 'Certificato da Trustera'
+                    const certSize = 7
+                    const certWidth = font.widthOfTextAtSize(certText, certSize)
+                    pg.drawText(certText, {
+                        x: bx + (bw - certWidth) / 2,
+                        y: by - 10,
+                        size: certSize,
+                        font,
+                        color: rgb(0.5, 0.5, 0.5),
+                    })
+                }
+            }
+
+            console.log(`[signature-complete] Signature box with name embedded on ${allPages.length} pages for: ${signerName}`)
 
             console.log(`[signature-complete] Typed signature box embedded for: ${signerName}`)
         }

@@ -415,6 +415,8 @@ export default function FirmaPage() {
                             />
                             <span className="text-sm text-gray-700">
                                 ACCETTO le condizioni di cui al Contratto gratuito per i servizi di mediazione e tutti i consensi di cui all'informativa privacy.
+                                <br />
+                                <button type="button" onClick={() => setShowMarketingInfo(true)} className="text-gray-500 underline text-xs mt-1">Leggi l'informativa privacy</button>
                             </span>
                         </label>
 

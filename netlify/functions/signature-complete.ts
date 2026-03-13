@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { TRUSTERA_LOGO_BASE64 } from './trustera-logo'
 const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -160,17 +161,34 @@ export const handler: Handler = async (event) => {
                 color: rgb(0, 0, 0),
             })
 
-            // "Certificato da Trustera" below the box
-            const certText = 'Certificato da Trustera'
-            const certSize = 7
-            const certWidth = font.widthOfTextAtSize(certText, certSize)
-            lastPage.drawText(certText, {
-                x: bx + (bw - certWidth) / 2,
-                y: by - 10,
-                size: certSize,
-                font,
-                color: rgb(0.5, 0.5, 0.5),
-            })
+            // Trustera logo below the box
+            try {
+                const logoBytes = Uint8Array.from(atob(TRUSTERA_LOGO_BASE64), c => c.charCodeAt(0))
+                const logoImage = await pdfDoc.embedJpg(logoBytes)
+                const logoMaxWidth = 80
+                const logoScale = logoMaxWidth / logoImage.width
+                const logoW = logoImage.width * logoScale
+                const logoH = logoImage.height * logoScale
+                lastPage.drawImage(logoImage, {
+                    x: bx + (bw - logoW) / 2,
+                    y: by - logoH - 5,
+                    width: logoW,
+                    height: logoH,
+                })
+            } catch (logoErr: any) {
+                // Fallback to text if logo fails
+                const certText = 'Certificato da Trustera'
+                const certSize = 7
+                const certWidth = font.widthOfTextAtSize(certText, certSize)
+                lastPage.drawText(certText, {
+                    x: bx + (bw - certWidth) / 2,
+                    y: by - 10,
+                    size: certSize,
+                    font,
+                    color: rgb(0.5, 0.5, 0.5),
+                })
+                console.error('[signature-complete] Failed to embed logo:', logoErr.message)
+            }
 
             console.log(`[signature-complete] Typed signature box embedded for: ${signerName}`)
         }

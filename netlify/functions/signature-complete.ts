@@ -130,7 +130,7 @@ export const handler: Handler = async (event) => {
             let logoImage: any = null
             let logoW = 0, logoH = 0
             try {
-                const logoBytes = Uint8Array.from(atob(TRUSTERA_LOGO_BASE64), c => c.charCodeAt(0))
+                const logoBytes = Buffer.from(TRUSTERA_LOGO_BASE64, 'base64')
                 logoImage = await pdfDoc.embedJpg(logoBytes)
                 const logoMaxWidth = 80
                 const logoScale = logoMaxWidth / logoImage.width

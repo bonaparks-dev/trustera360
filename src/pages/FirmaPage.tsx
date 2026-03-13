@@ -18,7 +18,7 @@ export default function FirmaPage() {
     const [signerName, setSignerName] = useState('')
     const [signerEmail, setSignerEmail] = useState('')
     const [contract, setContract] = useState<ContractInfo | null>(null)
-    const [signedPdfUrl, setSignedPdfUrl] = useState<string | null>(null)
+    const [, setSignedPdfUrl] = useState<string | null>(null)
     const [signedAt, setSignedAt] = useState<string | null>(null)
     const [otp, setOtp] = useState(['', '', '', '', '', ''])
     const [error, setError] = useState('')
@@ -473,16 +473,6 @@ export default function FirmaPage() {
                         <p className="text-gray-500 text-sm mb-6">
                             Riceverai una copia del documento firmato via WhatsApp.
                         </p>
-                        {signedPdfUrl && (
-                            <a
-                                href={signedPdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
-                            >
-                                Scarica Documento Firmato
-                            </a>
-                        )}
                     </div>
                 )}
             </div>

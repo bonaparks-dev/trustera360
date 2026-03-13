@@ -119,72 +119,60 @@ export const handler: Handler = async (event) => {
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 
-        // Embed handwritten signature on the last page of the original contract
-        if (signatureImage && signatureImage.startsWith('data:image/png;base64,')) {
-            try {
-                const base64Data = signatureImage.replace('data:image/png;base64,', '')
-                const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
-                const sigImage = await pdfDoc.embedPng(sigBytes)
+        // Embed typed signature (name in rounded box + Certificato da Trustera) on last page
+        {
+            const pages = pdfDoc.getPages()
+            const lastPage = pages[pages.length - 1]
+            const { width: pageWidth } = lastPage.getSize()
+            const signerName = sigRequest.signer_name || 'N/A'
 
-                const pages = pdfDoc.getPages()
-                const lastPage = pages[pages.length - 1]
-                const { width: pageWidth, height: pageHeight } = lastPage.getSize()
+            // Box dimensions
+            const boxWidth = 200
+            const boxHeight = 60
+            const boxX = pageWidth * 0.35 + (160 - boxWidth) / 2 + 20
+            const boxY = 30
+            const borderRadius = 6
+            const borderColor = rgb(0.75, 0.75, 0.75)
 
-                // Place signature in the "Firma del 1 guidatore" box area
-                // Typically the signature boxes are at the bottom of the last page
-                // Position: center-right area (second column), near the bottom
-                const sigMaxWidth = 160
-                const sigMaxHeight = 50
-                const sigDims = sigImage.scale(Math.min(sigMaxWidth / sigImage.width, sigMaxHeight / sigImage.height))
+            // Draw rounded rectangle border (approximated with lines + corners)
+            const r = borderRadius
+            const bx = boxX
+            const by = boxY
+            const bw = boxWidth
+            const bh = boxHeight
+            // Top line
+            lastPage.drawLine({ start: { x: bx + r, y: by + bh }, end: { x: bx + bw - r, y: by + bh }, thickness: 1, color: borderColor })
+            // Bottom line
+            lastPage.drawLine({ start: { x: bx + r, y: by }, end: { x: bx + bw - r, y: by }, thickness: 1, color: borderColor })
+            // Left line
+            lastPage.drawLine({ start: { x: bx, y: by + r }, end: { x: bx, y: by + bh - r }, thickness: 1, color: borderColor })
+            // Right line
+            lastPage.drawLine({ start: { x: bx + bw, y: by + r }, end: { x: bx + bw, y: by + bh - r }, thickness: 1, color: borderColor })
 
-                // "Firma del 1 guidatore" box is roughly in the middle third of the page width, near the bottom
-                const sigX = pageWidth * 0.35 + (sigMaxWidth - sigDims.width) / 2
-                const sigY = 45 // Near the very bottom of the page, inside the signature box
+            // Signer name centered in box
+            const nameSize = 14
+            const nameWidth = fontBold.widthOfTextAtSize(signerName, nameSize)
+            lastPage.drawText(signerName, {
+                x: bx + (bw - nameWidth) / 2,
+                y: by + bh / 2 + 2,
+                size: nameSize,
+                font: fontBold,
+                color: rgb(0, 0, 0),
+            })
 
-                lastPage.drawImage(sigImage, {
-                    x: sigX,
-                    y: sigY,
-                    width: sigDims.width,
-                    height: sigDims.height,
-                })
+            // "Certificato da Trustera" below the box
+            const certText = 'Certificato da Trustera'
+            const certSize = 7
+            const certWidth = font.widthOfTextAtSize(certText, certSize)
+            lastPage.drawText(certText, {
+                x: bx + (bw - certWidth) / 2,
+                y: by - 10,
+                size: certSize,
+                font,
+                color: rgb(0.5, 0.5, 0.5),
+            })
 
-                console.log(`[signature-complete] Handwritten signature 1 embedded at (${sigX}, ${sigY}) size ${sigDims.width}x${sigDims.height}`)
-            } catch (sigErr: any) {
-                console.error('[signature-complete] Failed to embed signature image:', sigErr.message)
-                // Continue without signature image — OTP alone is still valid
-            }
-        }
-
-        // Embed 2nd driver signature if provided
-        if (signatureImage2 && signatureImage2.startsWith('data:image/png;base64,')) {
-            try {
-                const base64Data2 = signatureImage2.replace('data:image/png;base64,', '')
-                const sigBytes2 = Uint8Array.from(atob(base64Data2), c => c.charCodeAt(0))
-                const sigImage2 = await pdfDoc.embedPng(sigBytes2)
-
-                const pages = pdfDoc.getPages()
-                const lastPage = pages[pages.length - 1]
-                const { width: pageWidth } = lastPage.getSize()
-
-                const sigMaxWidth = 160
-                const sigMaxHeight = 50
-                const sigDims2 = sigImage2.scale(Math.min(sigMaxWidth / sigImage2.width, sigMaxHeight / sigImage2.height))
-
-                // "Firma del 2 guidatore" box is in the right third of the page
-                const sigX2 = pageWidth * 0.67 + (sigMaxWidth - sigDims2.width) / 2
-                const sigY2 = 45
-
-                lastPage.drawImage(sigImage2, {
-                    x: sigX2,
-                    y: sigY2,
-                    width: sigDims2.width,
-                    height: sigDims2.height,
-                })
-
-                console.log(`[signature-complete] Handwritten signature 2 embedded at (${sigX2}, ${sigY2})`)
-            } catch (sigErr: any) {
-                console.error('[signature-complete] Failed to embed 2nd driver signature:', sigErr.message)
-            }
+            console.log(`[signature-complete] Typed signature box embedded for: ${signerName}`)
         }
 
         // Add attestation page

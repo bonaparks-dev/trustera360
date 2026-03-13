@@ -2,7 +2,6 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
-import { TRUSTERA_LOGO_BASE64 } from './trustera-logo'
 const supabase = createClient(
     process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -116,102 +115,30 @@ export const handler: Handler = async (event) => {
         const pdfDoc = await PDFDocument.load(originalPdfBytes)
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
-        const fontItalic = await pdfDoc.embedFont(StandardFonts.HelveticaOblique)
+
 
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 
-        // Embed typed signature (name in rounded box + Trustera logo) on ALL pages
+        // Add signer full name on footer right of ALL pages
         {
             const allPages = pdfDoc.getPages()
             const signerName = sigRequest.signer_name || 'N/A'
 
-            // Embed logo once, reuse on all pages
-            let logoImage: any = null
-            let logoW = 0, logoH = 0
-            try {
-                const logoBytes = Buffer.from(TRUSTERA_LOGO_BASE64, 'base64')
-                logoImage = await pdfDoc.embedJpg(logoBytes)
-                const logoMaxWidth = 80
-                const logoScale = logoMaxWidth / logoImage.width
-                logoW = logoImage.width * logoScale
-                logoH = logoImage.height * logoScale
-            } catch (logoErr: any) {
-                console.error('[signature-complete] Failed to load logo:', logoErr.message)
-            }
-
             for (const pg of allPages) {
                 const { width: pageWidth } = pg.getSize()
-
-                // Box dimensions
-                const boxWidth = 200
-                const boxHeight = 60
-                const boxX = pageWidth * 0.35 + (160 - boxWidth) / 2 + 20
-                const boxY = 30
-                const r = 6
-                const borderColor = rgb(0.75, 0.75, 0.75)
-                const bx = boxX, by = boxY, bw = boxWidth, bh = boxHeight
-
-                // Rounded rectangle border
-                pg.drawLine({ start: { x: bx + r, y: by + bh }, end: { x: bx + bw - r, y: by + bh }, thickness: 1, color: borderColor })
-                pg.drawLine({ start: { x: bx + r, y: by }, end: { x: bx + bw - r, y: by }, thickness: 1, color: borderColor })
-                pg.drawLine({ start: { x: bx, y: by + r }, end: { x: bx, y: by + bh - r }, thickness: 1, color: borderColor })
-                pg.drawLine({ start: { x: bx + bw, y: by + r }, end: { x: bx + bw, y: by + bh - r }, thickness: 1, color: borderColor })
-
-                // Signer name in italic, centered in box
-                const nameSize = 14
-                const nameWidth = fontItalic.widthOfTextAtSize(signerName, nameSize)
+                const nameSize = 8
+                const nameWidth = font.widthOfTextAtSize(signerName, nameSize)
                 pg.drawText(signerName, {
-                    x: bx + (bw - nameWidth) / 2,
-                    y: by + bh / 2 + 2,
+                    x: pageWidth - nameWidth - 30,
+                    y: 15,
                     size: nameSize,
-                    font: fontItalic,
-                    color: rgb(0, 0, 0),
+                    font,
+                    color: rgb(0.3, 0.3, 0.3),
                 })
-
-                // "——— ✓ Certificato da [logo] ———" between lines below the box
-                const certY = by - 12
-                const certText = 'Certificato da'
-                const certSize = 7
-                const checkText = ''
-                const checkWidth = 0
-                const certTextWidth = font.widthOfTextAtSize(certText, certSize)
-                const logoDisplayW = logoImage ? 40 : 0
-                const logoDisplayH = logoImage ? (40 * logoH / logoW) : 0
-                const gap = 3
-                const totalContentWidth = checkWidth + gap + certTextWidth + gap + logoDisplayW
-                const lineLength = (bw - totalContentWidth - 20) / 2
-                const lineColor = rgb(0.75, 0.75, 0.75)
-                const startX = bx + (bw - totalContentWidth - lineLength * 2 - 20) / 2
-
-                // Left line
-                pg.drawLine({ start: { x: startX, y: certY }, end: { x: startX + lineLength, y: certY }, thickness: 0.5, color: lineColor })
-
-                let cx = startX + lineLength + 5
-                // (checkmark removed)
-
-                // "Certificato da" text
-                pg.drawText(certText, { x: cx, y: certY - 3, size: certSize, font, color: rgb(0.5, 0.5, 0.5) })
-                cx += certTextWidth + gap
-
-                // Trustera logo inline
-                if (logoImage) {
-                    pg.drawImage(logoImage, {
-                        x: cx,
-                        y: certY - logoDisplayH / 2,
-                        width: logoDisplayW,
-                        height: logoDisplayH,
-                    })
-                    cx += logoDisplayW + 5
-                }
-
-                // Right line
-                pg.drawLine({ start: { x: cx, y: certY }, end: { x: cx + lineLength, y: certY }, thickness: 0.5, color: lineColor })
             }
 
-            console.log(`[signature-complete] Signature box with name embedded on ${allPages.length} pages for: ${signerName}`)
-
-            console.log(`[signature-complete] Typed signature box embedded for: ${signerName}`)
+            console.log(`[signature-complete] Footer name added on ${allPages.length} pages for: ${signerName}`)
         }
 
         // Add attestation page

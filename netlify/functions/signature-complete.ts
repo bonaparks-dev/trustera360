@@ -173,7 +173,7 @@ export const handler: Handler = async (event) => {
                 const certY = by - 12
                 const certText = 'Certificato da'
                 const certSize = 7
-                const checkText = '\u2713'
+                const checkText = 'v'
                 const checkWidth = font.widthOfTextAtSize(checkText, certSize)
                 const certTextWidth = font.widthOfTextAtSize(certText, certSize)
                 const logoDisplayW = logoImage ? 40 : 0

@@ -417,37 +417,18 @@ export default function FirmaPage() {
 
                         {existingMarketingConsent !== true && (
                             <div className="mb-6">
-                                <p className="text-sm text-gray-700 mb-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowMarketingInfo(true)}
-                                        className="underline text-yellow-700 hover:text-yellow-800 transition-colors"
-                                    >
-                                        Accetto vantaggi, offerte e sconti dedicati da Trustera e partner.
-                                    </button>
-                                </p>
-                                <div className="flex gap-4">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="marketing"
-                                            checked={acceptedMarketing === true}
-                                            onChange={() => setAcceptedMarketing(true)}
-                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
-                                        />
-                                        <span className="text-sm font-medium text-gray-700">Si</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                        <input
-                                            type="radio"
-                                            name="marketing"
-                                            checked={acceptedMarketing === false}
-                                            onChange={() => setAcceptedMarketing(false)}
-                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
-                                        />
-                                        <span className="text-sm font-medium text-gray-700">No</span>
-                                    </label>
-                                </div>
+                                <p className="text-sm font-bold text-gray-800 mb-3">Informativa privacy</p>
+                                <label className="flex items-start gap-3 cursor-pointer bg-white border border-gray-300 rounded-xl p-4">
+                                    <input
+                                        type="checkbox"
+                                        checked={acceptedMarketing === true}
+                                        onChange={(e) => setAcceptedMarketing(e.target.checked ? true : false)}
+                                        className="h-5 w-5 mt-0.5 text-yellow-600 focus:ring-yellow-500 rounded border-gray-300"
+                                    />
+                                    <span className="text-sm text-gray-700">
+                                        <span className="text-yellow-600 font-semibold">ACCETTO</span> le condizioni di cui al <button type="button" onClick={() => setShowMarketingInfo(true)} className="text-yellow-600 font-semibold underline">Contratto</button> gratuito per i servizi di mediazione e tutti i consensi di cui all'<button type="button" onClick={() => setShowMarketingInfo(true)} className="text-yellow-600 font-semibold underline">informativa privacy</button>. Se vuoi selezionare i consensi uno alla volta, clicca qui per gestirli.
+                                    </span>
+                                </label>
                             </div>
                         )}
 

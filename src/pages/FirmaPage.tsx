@@ -403,24 +403,35 @@ export default function FirmaPage() {
                             </p>
                         </div>
 
-                        <label className="flex items-start gap-3 mb-6 cursor-pointer border border-gray-300 rounded-xl p-4">
+                        <label className="flex items-start gap-3 mb-4 cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={acceptedTerms}
-                                onChange={e => {
-                                    setAcceptedTerms(e.target.checked)
-                                    if (existingMarketingConsent !== true) setAcceptedMarketing(e.target.checked ? true : false)
-                                }}
+                                onChange={e => setAcceptedTerms(e.target.checked)}
                                 className="mt-1 h-5 w-5 rounded border-gray-300 text-gray-700 focus:ring-gray-500"
                             />
                             <span className="text-sm text-gray-700">
-                                ACCETTO le condizioni di cui al Contratto gratuito per i servizi di mediazione e tutti i consensi di cui all'<button type="button" onClick={() => setShowMarketingInfo(true)} className="text-gray-700 underline">informativa privacy</button>.
+                                Confermo che i dati inseriti sono corretti e accetto i termini e le condizioni del documento.
                             </span>
                         </label>
 
+                        {existingMarketingConsent !== true && (
+                            <label className="flex items-start gap-3 mb-6 cursor-pointer border border-gray-300 rounded-xl p-4">
+                                <input
+                                    type="checkbox"
+                                    checked={acceptedMarketing === true}
+                                    onChange={e => setAcceptedMarketing(e.target.checked ? true : false)}
+                                    className="mt-1 h-5 w-5 rounded border-gray-300 text-gray-700 focus:ring-gray-500"
+                                />
+                                <span className="text-sm text-gray-700">
+                                    ACCETTO le condizioni di cui al Contratto gratuito per i servizi di mediazione e tutti i consensi di cui all'<button type="button" onClick={() => setShowMarketingInfo(true)} className="text-gray-700 underline">informativa privacy</button>.
+                                </span>
+                            </label>
+                        )}
+
                         <button
                             onClick={handleSign}
-                            disabled={!acceptedTerms}
+                            disabled={!acceptedTerms || (existingMarketingConsent !== true && acceptedMarketing === null)}
                             className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg"
                         >
                             Firma il Documento

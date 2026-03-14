@@ -29,6 +29,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [signerName, setSignerName] = useState('')
   const [signerEmail, setSignerEmail] = useState('')
+  const [signerPhone, setSignerPhone] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('sent')
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -141,6 +142,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           pdf_url: publicUrl,
           signer_name: signerName,
           signer_email: signerEmail,
+          signer_phone: signerPhone || null,
           status: 'pending'
         })
         .select()
@@ -164,6 +166,7 @@ export default function DashboardPage({ session }: { session: Session }) {
       setSelectedFile(null)
       setSignerName('')
       setSignerEmail('')
+      setSignerPhone('')
       loadDocuments()
     } catch (error: any) {
       toast.error(error.message || 'Errore nel caricamento')
@@ -380,6 +383,16 @@ export default function DashboardPage({ session }: { session: Session }) {
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-800 focus:outline-none focus:border-green-500"
                   placeholder="firmatario@email.com"
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp Firmatario <span className="text-gray-400 font-normal">(opzionale)</span></label>
+                <input
+                  type="tel"
+                  value={signerPhone}
+                  onChange={e => setSignerPhone(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-800 focus:outline-none focus:border-green-500"
+                  placeholder="+39 347 1234567"
                 />
               </div>
               <div className="flex gap-3 pt-2">

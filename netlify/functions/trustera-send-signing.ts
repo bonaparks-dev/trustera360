@@ -45,9 +45,40 @@ export const handler: Handler = async (event) => {
 
     if (updateError) throw updateError
 
-    // Send email to signer
     const signingUrl = `${process.env.SITE_URL || 'https://trustera360.app'}/sign/${token}`
 
+    // Send signing link via WhatsApp if phone is available
+    const signerPhone = doc.signer_phone || ''
+    const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
+    const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
+
+    if (signerPhone && GREEN_API_INSTANCE_ID && GREEN_API_TOKEN) {
+      try {
+        let cleanPhone = signerPhone.replace(/[\s\-\+\(\)]/g, '')
+        if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
+        if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
+
+        const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
+        const waResponse = await fetch(greenApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chatId: `${cleanPhone}@c.us`,
+            message: `Ciao ${doc.signer_name},\n\nHai ricevuto un documento da firmare: *${doc.name}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
+          })
+        })
+        const waResult = await waResponse.json()
+        if (waResponse.ok && !waResult.error) {
+          console.log('[trustera-send-signing] WhatsApp sent:', waResult.idMessage)
+        } else {
+          console.warn('[trustera-send-signing] WhatsApp failed:', waResult)
+        }
+      } catch (waErr: any) {
+        console.warn('[trustera-send-signing] WhatsApp error:', waErr.message)
+      }
+    }
+
+    // Send email to signer
     await resend.emails.send({
       from: 'Trustera <noreply@trustera360.app>',
       replyTo: 'info@trustera360.app',
@@ -69,7 +100,7 @@ export const handler: Handler = async (event) => {
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden;">
           <tr>
             <td style="padding: 32px 40px 0; text-align: center;">
-              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" width="120" style="height: auto; max-height: 48px;" />
+              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" style="height: 80px; width: auto; max-width: 200px;" />
               <p style="margin: 8px 0 0; color: #666; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px;">Firma Elettronica</p>
             </td>
           </tr>

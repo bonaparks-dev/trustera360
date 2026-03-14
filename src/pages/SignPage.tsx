@@ -80,7 +80,7 @@ export default function SignPage() {
         body: JSON.stringify({ token, otp: otpCode })
       })
       const data = await res.json()
-      if (!res.ok) { setError(data.error); setStatus('otp_sent'); return }
+      if (!res.ok) { setError(data.debug ? `${data.error} (${data.debug})` : data.error); setStatus('otp_sent'); return }
       setStatus('signing')
     } catch {
       setError('Errore nella verifica')

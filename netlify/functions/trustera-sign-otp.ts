@@ -70,10 +70,15 @@ export const handler: Handler = async (event) => {
     const otp = crypto.randomInt(100000, 1000000).toString()
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min
 
-    await supabase
+    const { error: otpUpdateError } = await supabase
       .from('trustera_documents')
       .update({ otp_code: otp, otp_expires_at: otpExpires })
       .eq('id', doc.id)
+
+    if (otpUpdateError) {
+      console.error('[trustera-sign-otp] OTP update failed:', otpUpdateError)
+      return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio del codice' }) }
+    }
 
     // Try WhatsApp first, fallback to email
     let channel: 'whatsapp' | 'email' = 'email'
@@ -97,7 +102,7 @@ export const handler: Handler = async (event) => {
 
     if (channel === 'email') {
       await resend.emails.send({
-        from: 'Trustera <noreply@trustera360.app>',
+        from: 'Trustera <info@trustera360.app>',
         replyTo: 'info@trustera360.app',
         to: doc.signer_email,
         subject: 'Codice di verifica Trustera',

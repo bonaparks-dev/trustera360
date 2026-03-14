@@ -15,60 +15,44 @@ export const handler: Handler = async (event) => {
     }
 
     try {
-        const { email, password, fullName } = JSON.parse(event.body || '{}')
+        const { email } = JSON.parse(event.body || '{}')
 
-        if (!email || !password || !fullName) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'Email, password e nome sono obbligatori' }) }
+        if (!email) {
+            return { statusCode: 400, body: JSON.stringify({ error: 'Email obbligatoria' }) }
         }
 
-        if (password.length < 6) {
-            return { statusCode: 400, body: JSON.stringify({ error: 'La password deve avere almeno 6 caratteri' }) }
+        // Check if user exists and email is not yet confirmed
+        const { data: { users }, error: listError } = await supabase.auth.admin.listUsers()
+        if (listError) throw listError
+
+        const user = users.find(u => u.email === email)
+        if (!user) {
+            // Don't reveal whether the email exists
+            return { statusCode: 200, body: JSON.stringify({ success: true, message: 'Se l\'email esiste, riceverai un nuovo link di conferma.' }) }
         }
 
-        // Create user via admin API (does NOT send Supabase's default email)
-        const { data: userData, error: createError } = await supabase.auth.admin.createUser({
-            email,
-            password,
-            email_confirm: false,
-            user_metadata: { full_name: fullName }
-        })
-
-        if (createError) {
-            // Handle duplicate email
-            if (createError.message?.includes('already been registered') || createError.message?.includes('already exists')) {
-                return { statusCode: 409, body: JSON.stringify({ error: 'Questa email e gia registrata. Prova ad accedere.' }) }
-            }
-            console.error('[trustera-signup] Create user error:', createError.message)
-            return { statusCode: 400, body: JSON.stringify({ error: createError.message }) }
+        if (user.email_confirmed_at) {
+            return { statusCode: 200, body: JSON.stringify({ success: true, message: 'Email gia confermata. Prova ad accedere.' }) }
         }
 
-        if (!userData.user) {
-            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nella creazione dell\'account' }) }
-        }
-
-        // Generate email confirmation link via admin API
+        // Generate new verification link
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
             type: 'signup',
             email,
-            password,
             options: {
                 redirectTo: `${SITE_URL}/dashboard`
             }
         })
 
         if (linkError) {
-            console.error('[trustera-signup] Generate link error:', linkError.message)
-            // User is created but link failed — still try to send a basic link
+            console.error('[trustera-resend-verification] Generate link error:', linkError.message)
+            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nella generazione del link' }) }
         }
 
-        // Extract the token from the generated link
-        // Supabase generates: https://project.supabase.co/auth/v1/verify?token=xxx&type=signup&redirect_to=...
-        // We want to send our own branded email with a link to our verify endpoint
-        let verifyUrl = `${SITE_URL}/login` // fallback
+        let verifyUrl = `${SITE_URL}/login`
         if (linkData?.properties?.hashed_token) {
             verifyUrl = `${SITE_URL}/.netlify/functions/trustera-verify-email?token_hash=${linkData.properties.hashed_token}&type=signup&redirect_to=${encodeURIComponent(`${SITE_URL}/dashboard`)}`
         } else if (linkData?.properties?.action_link) {
-            // Use the action link directly but route through our function
             const url = new URL(linkData.properties.action_link)
             const tokenHash = url.searchParams.get('token_hash') || url.searchParams.get('token')
             if (tokenHash) {
@@ -78,10 +62,10 @@ export const handler: Handler = async (event) => {
             }
         }
 
-        // Send branded verification email via Resend
+        const fullName = user.user_metadata?.full_name || 'Utente'
+
         const resendApiKey = process.env.RESEND_API_KEY
         if (!resendApiKey) {
-            console.error('[trustera-signup] RESEND_API_KEY not set')
             return { statusCode: 500, body: JSON.stringify({ error: 'Errore di configurazione email' }) }
         }
 
@@ -92,7 +76,7 @@ export const handler: Handler = async (event) => {
             replyTo: 'info@trustera360.app',
             to: email,
             subject: 'Conferma il tuo account Trustera',
-            text: `Benvenuto su Trustera!\n\nCiao ${fullName}, conferma il tuo indirizzo email per attivare il tuo account.\n\nClicca qui per confermare: ${verifyUrl}\n\nSe non hai creato un account su Trustera, ignora questa email.\nIl link scade tra 24 ore.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+            text: `Ciao ${fullName}, conferma il tuo indirizzo email per attivare il tuo account Trustera.\n\nClicca qui per confermare: ${verifyUrl}\n\nSe non hai creato un account su Trustera, ignora questa email.\nIl link scade tra 24 ore.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
             html: `<!DOCTYPE html>
 <html lang="it" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -114,7 +98,7 @@ export const handler: Handler = async (event) => {
           <tr>
             <td style="padding: 32px 40px 0; text-align: center;">
               <h1 style="margin: 0 0 8px; color: #111827; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 24px; font-weight: 700;">
-                Benvenuto su Trustera
+                Conferma il tuo account
               </h1>
               <p style="margin: 0; color: #6b7280; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.5;">
                 Ciao ${fullName}, conferma il tuo indirizzo email per attivare il tuo account.
@@ -124,10 +108,8 @@ export const handler: Handler = async (event) => {
           <tr>
             <td style="padding: 32px 40px; text-align: center;">
               <a href="${verifyUrl}"
-                 style="display: inline-block; background-color: #16a34a; color: #ffffff; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 700; text-decoration: none; padding: 14px 40px; border-radius: 8px; mso-padding-alt: 0;">
-                <!--[if mso]><i style="mso-font-width: 200%; mso-text-raise: 21pt;">&nbsp;</i><![endif]-->
+                 style="display: inline-block; background-color: #16a34a; color: #ffffff; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 700; text-decoration: none; padding: 14px 40px; border-radius: 8px;">
                 Conferma Email
-                <!--[if mso]><i style="mso-font-width: 200%;">&nbsp;</i><![endif]-->
               </a>
             </td>
           </tr>
@@ -163,21 +145,21 @@ export const handler: Handler = async (event) => {
         })
 
         if (emailError) {
-            console.error('[trustera-signup] Resend error:', emailError)
-            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio dell\'email di conferma' }) }
+            console.error('[trustera-resend-verification] Resend error:', emailError)
+            return { statusCode: 500, body: JSON.stringify({ error: 'Errore nell\'invio dell\'email' }) }
         }
 
-        console.log(`[trustera-signup] Verification email sent to ${email}`)
+        console.log(`[trustera-resend-verification] Verification email resent to ${email}`)
 
         return {
             statusCode: 200,
-            body: JSON.stringify({ success: true, message: 'Account creato! Controlla la tua email per confermare.' })
+            body: JSON.stringify({ success: true, message: 'Email di conferma inviata! Controlla la tua casella di posta.' })
         }
     } catch (error: any) {
-        console.error('[trustera-signup] Error:', error)
+        console.error('[trustera-resend-verification] Error:', error)
         return {
             statusCode: 500,
-            body: JSON.stringify({ error: error.message || 'Errore nella registrazione' })
+            body: JSON.stringify({ error: error.message || 'Errore nell\'invio' })
         }
     }
 }

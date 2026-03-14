@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import PrivacyPage from './pages/PrivacyPage'
 import SignPage from './pages/SignPage'
 import FirmaPage from './pages/FirmaPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import type { Session } from '@supabase/supabase-js'
 
 function ProtectedRoute({ session, children }: { session: Session | null; children: React.ReactNode }) {
@@ -51,6 +52,7 @@ export default function App() {
         </ProtectedRoute>
       } />
       <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/sign/:token" element={<SignPage />} />
       <Route path="/firma/:token" element={<FirmaPage />} />
     </Routes>

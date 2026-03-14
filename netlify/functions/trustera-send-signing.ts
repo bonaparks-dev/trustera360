@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
@@ -50,30 +50,67 @@ export const handler: Handler = async (event) => {
 
     await resend.emails.send({
       from: 'Trustera <noreply@trustera360.app>',
+      replyTo: 'info@trustera360.app',
       to: doc.signer_email,
       subject: `Documento da firmare: ${doc.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #0d3d2a; margin: 0;">TRUSTERA</h1>
-            <p style="color: #666; margin: 5px 0;">Firma Elettronica</p>
-          </div>
-          <p>Ciao <strong>${doc.signer_name}</strong>,</p>
-          <p>Hai ricevuto un documento da firmare: <strong>${doc.name}</strong></p>
-          <p>Clicca il pulsante qui sotto per visualizzare e firmare il documento:</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${signingUrl}" style="background-color: #16a34a; color: white; padding: 14px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-              Firma il Documento
-            </a>
-          </div>
-          <p style="color: #999; font-size: 12px;">Questo link scade tra 7 giorni.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-          <p style="color: #999; font-size: 12px; text-align: center;">
-            Trustera - Infrastructure for Digital Trust<br/>
-            <a href="https://trustera360.app" style="color: #16a34a;">www.trustera360.app</a>
-          </p>
-        </div>
-      `
+      text: `Ciao ${doc.signer_name},\n\nHai ricevuto un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+      html: `<!DOCTYPE html>
+<html lang="it" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Documento da firmare</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 40px 0; text-align: center;">
+              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" width="120" style="height: auto; max-height: 48px;" />
+              <p style="margin: 8px 0 0; color: #666; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 14px;">Firma Elettronica</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: #333; line-height: 1.6;">
+              <p style="margin: 0 0 12px;">Ciao <strong>${doc.signer_name}</strong>,</p>
+              <p style="margin: 0 0 12px;">Hai ricevuto un documento da firmare: <strong>${doc.name}</strong></p>
+              <p style="margin: 0;">Clicca il pulsante qui sotto per visualizzare e firmare il documento:</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 40px; text-align: center;">
+              <a href="${signingUrl}" style="display: inline-block; background-color: #16a34a; color: #ffffff; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; font-weight: 700; text-decoration: none; padding: 14px 32px; border-radius: 8px;">
+                Firma il Documento
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 24px; text-align: center;">
+              <p style="margin: 0; color: #999; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px;">Questo link scade tra 7 giorni.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px 32px; text-align: center;">
+              <p style="margin: 0; color: #d1d5db; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 11px;">
+                Trustera - Infrastructure for Digital Trust<br/>
+                <a href="https://trustera360.app" style="color: #16a34a; text-decoration: none;">www.trustera360.app</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
     })
 
     return {

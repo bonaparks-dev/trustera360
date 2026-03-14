@@ -4,7 +4,7 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
@@ -98,18 +98,64 @@ export const handler: Handler = async (event) => {
     if (channel === 'email') {
       await resend.emails.send({
         from: 'Trustera <noreply@trustera360.app>',
+        replyTo: 'info@trustera360.app',
         to: doc.signer_email,
         subject: 'Codice di verifica Trustera',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px; text-align: center;">
-            <h1 style="color: #0d3d2a;">TRUSTERA</h1>
-            <p>Il tuo codice di verifica:</p>
-            <div style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #16a34a; margin: 20px 0; padding: 16px; background: #f0fdf4; border-radius: 8px;">
-              ${otp}
-            </div>
-            <p style="color: #999; font-size: 12px;">Scade tra 10 minuti. Non condividere questo codice.</p>
-          </div>
-        `
+        text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+        html: `<!DOCTYPE html>
+<html lang="it" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Codice di verifica</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f9fafb;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f9fafb;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" width="400" cellpadding="0" cellspacing="0" style="max-width: 400px; background: #ffffff; border-radius: 12px; overflow: hidden;">
+          <tr>
+            <td style="padding: 32px 40px 0; text-align: center;">
+              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" width="120" style="height: auto; max-height: 48px;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px 0; text-align: center; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;">
+              <p style="margin: 0; color: #333; font-size: 15px;">Il tuo codice di verifica:</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 20px 40px; text-align: center;">
+              <div style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #16a34a; padding: 16px; background: #f0fdf4; border-radius: 8px;">
+                ${otp}
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 32px; text-align: center;">
+              <p style="margin: 0; color: #999; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px;">Scade tra 10 minuti. Non condividere questo codice.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px;">
+              <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 0;" />
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 24px 40px 32px; text-align: center;">
+              <p style="margin: 0; color: #d1d5db; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 11px;">
+                Trustera - Infrastructure for Digital Trust<br/>
+                <a href="https://trustera360.app" style="color: #16a34a; text-decoration: none;">www.trustera360.app</a>
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`
       })
     }
 

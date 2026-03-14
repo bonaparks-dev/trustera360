@@ -2,8 +2,15 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+// DR7 Supabase — primary (signature_requests, contracts, bookings, customers_extended)
 const supabase = createClient(
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+    process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+    process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// Trustera Supabase — secondary (copy signed docs + marketing consent)
+const supabaseTrustera = createClient(
+    process.env.SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
     process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
@@ -419,6 +426,60 @@ export const handler: Handler = async (event) => {
             } catch (waErr: any) {
                 console.error('[signature-complete] WhatsApp send failed:', waErr.message)
             }
+        }
+
+        // Dual-write to Trustera Supabase — copy signed document + marketing consent
+        try {
+            await supabaseTrustera.from('signed_documents_log').insert({
+                source: contract ? 'dr7_contract' : 'dr7_standalone',
+                document_name: contract ? (contract.contract_number || 'N/A') : (sigRequest.document_name || 'documento'),
+                signer_name: sigRequest.signer_name,
+                signer_email: sigRequest.signer_email,
+                signed_pdf_url: signedPdfUrl,
+                signed_at: signedAt.toISOString(),
+                original_pdf_hash: currentHash,
+                signed_pdf_hash: signedPdfHash,
+                signer_ip: ipAddress,
+                marketing_consent: marketingConsent !== undefined ? !!marketingConsent : null,
+                metadata: {
+                    document_identifier: docIdentifier,
+                    booking_id: contract?.booking_id || null,
+                    contract_id: sigRequest.contract_id || null,
+                }
+            })
+            console.log('[signature-complete] Signed doc copied to Trustera DB')
+
+            // Mirror marketing consent to Trustera
+            if (marketingConsent !== undefined && sigRequest.signer_email) {
+                const email = sigRequest.signer_email.toLowerCase()
+                const { data: existing } = await supabaseTrustera
+                    .from('marketing_consents')
+                    .select('marketing_consent')
+                    .eq('email', email)
+                    .maybeSingle()
+
+                if (existing) {
+                    // Never overwrite true with false (GDPR)
+                    if (existing.marketing_consent !== true || !!marketingConsent === true) {
+                        await supabaseTrustera.from('marketing_consents').update({
+                            marketing_consent: !!marketingConsent,
+                            consent_date: signedAt.toISOString(),
+                            name: sigRequest.signer_name,
+                            updated_at: signedAt.toISOString(),
+                        }).eq('email', email)
+                    }
+                } else {
+                    await supabaseTrustera.from('marketing_consents').insert({
+                        email,
+                        name: sigRequest.signer_name,
+                        marketing_consent: !!marketingConsent,
+                        consent_date: signedAt.toISOString(),
+                        source: contract ? 'dr7_contract' : 'dr7_standalone',
+                    })
+                }
+            }
+        } catch (syncErr: any) {
+            console.warn('[signature-complete] Trustera sync failed (non-blocking):', syncErr.message)
         }
 
         // Auto-send to CARGOS via admin panel (only for rental contracts with booking_id)

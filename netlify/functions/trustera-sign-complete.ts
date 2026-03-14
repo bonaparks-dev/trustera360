@@ -3,9 +3,16 @@ import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import crypto from 'crypto'
 
+// Trustera Supabase — primary (trustera_documents, signed_documents_log)
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+// DR7 Supabase — for customers_extended phone lookup
+const supabaseDR7 = createClient(
+  process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+  process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export const handler: Handler = async (event) => {
@@ -139,10 +146,27 @@ export const handler: Handler = async (event) => {
       })
       .eq('id', doc.id)
 
+    // Log to signed_documents_log
+    try {
+      await supabase.from('signed_documents_log').insert({
+        source: 'trustera',
+        document_name: doc.name,
+        signer_name: doc.signer_name,
+        signer_email: doc.signer_email,
+        signed_pdf_url: publicUrl,
+        signed_at: signedAt,
+        original_pdf_hash: originalHash,
+        signer_ip: ip,
+        metadata: { trustera_document_id: doc.id }
+      })
+    } catch (logErr: any) {
+      console.warn('[trustera-sign-complete] signed_documents_log insert failed:', logErr.message)
+    }
+
     // Send signed PDF via WhatsApp if phone available
     let signerPhone = doc.signer_phone || ''
     if (!signerPhone && doc.signer_email) {
-      const { data: customer } = await supabase
+      const { data: customer } = await supabaseDR7
         .from('customers_extended')
         .select('telefono')
         .eq('email', doc.signer_email)

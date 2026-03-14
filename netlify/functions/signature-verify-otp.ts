@@ -1,9 +1,10 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
+// DR7 Supabase — signature_requests, contracts, bookings live here
 const supabase = createClient(
-    process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
+    process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+    process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
 export const handler: Handler = async (event) => {

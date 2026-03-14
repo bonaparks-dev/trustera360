@@ -416,17 +416,39 @@ export default function FirmaPage() {
                         </label>
 
                         {existingMarketingConsent !== true && (
-                            <label className="flex items-start gap-3 mb-6 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={acceptedMarketing === true}
-                                    onChange={e => setAcceptedMarketing(e.target.checked ? true : false)}
-                                    className="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
-                                />
-                                <span className="text-sm text-gray-700">
-                                    ACCETTO le condizioni di cui al Contratto gratuito per i servizi di mediazione e tutti i consensi di cui all'<button type="button" onClick={() => setShowMarketingInfo(true)} className="text-gray-700 underline">informativa privacy</button>.
-                                </span>
-                            </label>
+                            <div className="mb-6">
+                                <p className="text-sm text-gray-700 mb-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMarketingInfo(true)}
+                                        className="underline text-yellow-700 hover:text-yellow-800 transition-colors"
+                                    >
+                                        Accetto vantaggi, offerte e sconti dedicati da Trustera e partner.
+                                    </button>
+                                </p>
+                                <div className="flex gap-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="marketing"
+                                            checked={acceptedMarketing === true}
+                                            onChange={() => setAcceptedMarketing(true)}
+                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">Si</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="radio"
+                                            name="marketing"
+                                            checked={acceptedMarketing === false}
+                                            onChange={() => setAcceptedMarketing(false)}
+                                            className="h-5 w-5 text-yellow-600 focus:ring-yellow-500"
+                                        />
+                                        <span className="text-sm font-medium text-gray-700">No</span>
+                                    </label>
+                                </div>
+                            </div>
                         )}
 
                         <button

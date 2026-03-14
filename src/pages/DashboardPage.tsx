@@ -11,10 +11,11 @@ interface Document {
   created_at: string
   signer_email: string
   signer_name: string
-  pdf_url: string
+  pdf_url?: string
   signed_pdf_url?: string
   signed_at?: string
   owner_id?: string
+  source?: string
 }
 
 type Tab = 'sent' | 'signed_by_me'
@@ -86,7 +87,32 @@ export default function DashboardPage({ session }: { session: Session }) {
     } else {
       // Filter out documents I own (to avoid duplicates)
       const externalDocs = (signedResult.data || []).filter((d: any) => d.owner_id !== session.user.id)
-      setSignedByMeDocuments(await processDocUrls(externalDocs))
+      const trusteraDocs = await processDocUrls(externalDocs)
+
+      // Also fetch signed documents from DR7 Supabase
+      let dr7Docs: Document[] = []
+      try {
+        const accessToken = session.access_token
+        const res = await fetch('/.netlify/functions/trustera-get-dr7-documents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: userEmail, accessToken })
+        })
+        if (res.ok) {
+          const { documents } = await res.json()
+          dr7Docs = (documents || []).map((d: any) => ({
+            ...d,
+            pdf_url: d.pdf_url || d.signed_pdf_url || '',
+          }))
+        }
+      } catch (err) {
+        console.warn('Could not fetch DR7 documents:', err)
+      }
+
+      // Merge and deduplicate (by signed_pdf_url to avoid showing same doc twice)
+      const seenUrls = new Set(trusteraDocs.map(d => d.signed_pdf_url).filter(Boolean))
+      const uniqueDR7 = dr7Docs.filter(d => !d.signed_pdf_url || !seenUrls.has(d.signed_pdf_url))
+      setSignedByMeDocuments([...trusteraDocs, ...uniqueDR7])
     }
 
     setLoading(false)
@@ -284,7 +310,9 @@ export default function DashboardPage({ session }: { session: Session }) {
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500">
-                      Richiesto da un altro utente
+                      {doc.source === 'dr7_contract' ? 'Contratto DR7 Empire' :
+                       doc.source === 'dr7_trustera' ? 'Documento DR7' :
+                       'Documento Trustera'}
                     </p>
                   )}
                   <p className="text-xs text-gray-400 mt-1">

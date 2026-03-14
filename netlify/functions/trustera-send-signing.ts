@@ -45,6 +45,17 @@ export const handler: Handler = async (event) => {
 
     if (updateError) throw updateError
 
+    // Get sender name from auth user
+    let senderName = 'Un utente Trustera'
+    if (doc.owner_id) {
+      const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
+      if (ownerUser?.user_metadata?.full_name) {
+        senderName = ownerUser.user_metadata.full_name
+      } else if (ownerUser?.email) {
+        senderName = ownerUser.email
+      }
+    }
+
     const signingUrl = `${process.env.SITE_URL || 'https://trustera360.app'}/sign/${token}`
 
     // Send signing link via WhatsApp if phone is available
@@ -64,7 +75,7 @@ export const handler: Handler = async (event) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             chatId: `${cleanPhone}@c.us`,
-            message: `Ciao ${doc.signer_name},\n\nHai ricevuto un documento da firmare: *${doc.name}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
+            message: `Ciao ${doc.signer_name},\n\n*${senderName}* ti ha inviato un documento da firmare: *${doc.name}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
           })
         })
         const waResult = await waResponse.json()
@@ -80,11 +91,11 @@ export const handler: Handler = async (event) => {
 
     // Send email to signer
     await resend.emails.send({
-      from: 'Trustera <noreply@trustera360.app>',
+      from: 'Trustera <info@trustera360.app>',
       replyTo: 'info@trustera360.app',
       to: doc.signer_email,
-      subject: `Documento da firmare: ${doc.name}`,
-      text: `Ciao ${doc.signer_name},\n\nHai ricevuto un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+      subject: `${senderName} ti ha inviato un documento da firmare`,
+      text: `Ciao ${doc.signer_name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
       html: `<!DOCTYPE html>
 <html lang="it" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -107,7 +118,7 @@ export const handler: Handler = async (event) => {
           <tr>
             <td style="padding: 24px 40px 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: #333; line-height: 1.6;">
               <p style="margin: 0 0 12px;">Ciao <strong>${doc.signer_name}</strong>,</p>
-              <p style="margin: 0 0 12px;">Hai ricevuto un documento da firmare: <strong>${doc.name}</strong></p>
+              <p style="margin: 0 0 12px;"><strong>${senderName}</strong> ti ha inviato un documento da firmare: <strong>${doc.name}</strong></p>
               <p style="margin: 0;">Clicca il pulsante qui sotto per visualizzare e firmare il documento:</p>
             </td>
           </tr>

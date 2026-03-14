@@ -160,7 +160,7 @@ export default function SignPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-[#0d3d2a] text-white py-4 px-6 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
         <div className="flex items-center">
           <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 w-auto" />
         </div>

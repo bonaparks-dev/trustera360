@@ -108,7 +108,7 @@ export const handler: Handler = async (event) => {
         <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden;">
           <tr>
             <td style="padding: 40px 40px 0; text-align: center;">
-              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" width="120" style="height: auto; max-height: 48px;" />
+              <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" style="height: 80px; width: auto; max-width: 200px;" />
             </td>
           </tr>
           <tr>

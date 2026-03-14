@@ -5,16 +5,15 @@ export default function LandingPage() {
     <div className="min-h-screen bg-white text-gray-900">
       {/* Header */}
       <header className="border-b border-gray-100">
-        <div className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10" />
-            <span className="text-xl font-bold tracking-tight text-[#0d3d2a]">TRUSTERA</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm text-gray-500 hover:text-gray-800 transition-colors px-4 py-2">
-              Accedi
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 max-w-6xl mx-auto">
+          <Link to="/" className="flex items-center shrink-0">
+            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10 sm:h-14 w-auto" />
+          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link to="/login" className="text-sm text-gray-500 hover:text-gray-800 transition-colors px-3 sm:px-4 py-2 whitespace-nowrap">
+              Log in
             </Link>
-            <Link to="/login" className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-6 py-2.5 rounded-lg transition-colors shadow-md shadow-green-600/20">
+            <Link to="/login" className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-4 sm:px-6 py-2.5 rounded-lg transition-colors shadow-md shadow-green-600/20 whitespace-nowrap">
               Inizia Gratis
             </Link>
           </div>

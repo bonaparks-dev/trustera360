@@ -5,9 +5,8 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-200 px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-3">
-            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-8" />
-            <span className="text-lg font-bold text-[#0d3d2a]">TRUSTERA</span>
+          <Link to="/" className="flex items-center">
+            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 w-auto" />
           </Link>
         </div>
       </header>

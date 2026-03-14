@@ -34,7 +34,6 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        // Use our Netlify function that sends branded email via Resend
         const res = await fetch('/.netlify/functions/trustera-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -70,62 +69,98 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0a2e1f] via-[#0d3d2a] to-[#0a2e1f] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
-        <div className="text-center mb-8">
+    <div className="min-h-[100dvh] bg-gradient-to-br from-[#0a2e1f] via-[#0d3d2a] to-[#0a2e1f] flex flex-col items-center justify-center px-5 py-10">
+
+      {/* Card */}
+      <div
+        className="w-full max-w-[400px] rounded-3xl p-8 sm:p-10"
+        style={{
+          background: 'rgba(255,255,255,0.95)',
+          backdropFilter: 'blur(40px)',
+          WebkitBackdropFilter: 'blur(40px)',
+          boxShadow: '0 8px 60px rgba(0,0,0,0.25), 0 1px 3px rgba(0,0,0,0.08)',
+        }}
+      >
+        {/* Logo */}
+        <div className="flex justify-center mb-8">
           <Link to="/">
-            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 mx-auto mb-3" />
+            <img
+              src="/trustera-logo.jpeg"
+              alt="Trustera"
+              className="h-14 w-auto"
+            />
           </Link>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {isSignUp ? 'Crea Account' : 'Accedi'}
-          </h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {isSignUp ? 'Registrati per iniziare a firmare' : 'Accedi al tuo account Trustera'}
-          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Title */}
+        <h1 className="text-center text-[26px] sm:text-[28px] font-semibold tracking-tight text-gray-900 mb-1">
+          {isSignUp ? 'Crea Account' : 'Log in'}
+        </h1>
+        <p className="text-center text-[15px] text-gray-400 mb-8 leading-snug">
+          {isSignUp
+            ? 'Registrati per iniziare a firmare'
+            : 'Accedi al tuo account Trustera'}
+        </p>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-5">
+
+          {/* Full name — signup only */}
           {isSignUp && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nome e Cognome</label>
+              <label className="block text-[13px] font-medium text-gray-500 mb-1.5 tracking-wide uppercase">
+                Nome e Cognome
+              </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-800 focus:outline-none focus:border-green-500 transition-colors"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-[16px] text-gray-900 placeholder-gray-300 outline-none transition-all focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-500/20"
                 placeholder="Mario Rossi"
                 required
+                autoComplete="name"
               />
             </div>
           )}
+
+          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-[13px] font-medium text-gray-500 mb-1.5 tracking-wide uppercase">
+              Email
+            </label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-800 focus:outline-none focus:border-green-500 transition-colors"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-[16px] text-gray-900 placeholder-gray-300 outline-none transition-all focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-500/20"
               placeholder="nome@email.com"
               required
+              autoComplete="email"
             />
           </div>
+
+          {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-[13px] font-medium text-gray-500 mb-1.5 tracking-wide uppercase">
+              Password
+            </label>
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 pr-12 text-gray-800 focus:outline-none focus:border-green-500 transition-colors"
-                placeholder="Min. 6 caratteri"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 pr-12 text-[16px] text-gray-900 placeholder-gray-300 outline-none transition-all focus:border-green-500 focus:bg-white focus:ring-2 focus:ring-green-500/20"
+                placeholder={isSignUp ? 'Min. 6 caratteri' : '••••••••'}
                 required
                 minLength={6}
+                autoComplete={isSignUp ? 'new-password' : 'current-password'}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-gray-350 hover:text-gray-600 transition-colors rounded-md"
                 tabIndex={-1}
+                aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}
               >
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -140,35 +175,42 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors text-lg"
+            className="w-full rounded-xl bg-[#16a34a] text-white font-semibold text-[16px] py-3.5 transition-all hover:bg-[#15803d] active:scale-[0.98] disabled:opacity-40 disabled:pointer-events-none"
           >
-            {loading ? 'Caricamento...' : isSignUp ? 'Registrati' : 'Accedi'}
+            {loading
+              ? <span className="inline-flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                  Caricamento...
+                </span>
+              : isSignUp ? 'Registrati' : 'Log in'}
           </button>
         </form>
 
+        {/* Forgot password link */}
         {!isSignUp && !showForgot && (
-          <div className="mt-3 text-center">
-            <button
-              type="button"
-              onClick={() => { setShowForgot(true); setForgotEmail(email) }}
-              className="text-sm text-gray-400 hover:text-green-600 transition-colors"
-            >
-              Password dimenticata?
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => { setShowForgot(true); setForgotEmail(email) }}
+            className="block w-full text-center text-[13px] text-gray-400 hover:text-green-600 transition-colors mt-4"
+          >
+            Password dimenticata?
+          </button>
         )}
 
+        {/* Forgot password form */}
         {showForgot && !isSignUp && (
-          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <p className="text-sm text-gray-700 mb-3 font-medium">Recupera password</p>
+          <div className="mt-5 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <p className="text-[14px] text-gray-700 font-medium mb-3">Recupera password</p>
             <input
               type="email"
               value={forgotEmail}
               onChange={e => setForgotEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-gray-800 text-sm focus:outline-none focus:border-green-500 transition-colors mb-3"
+              className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-[15px] text-gray-900 placeholder-gray-300 outline-none transition-all focus:border-green-500 focus:ring-2 focus:ring-green-500/20 mb-3"
               placeholder="La tua email"
             />
             <div className="flex gap-2">
@@ -187,22 +229,22 @@ export default function LoginPage() {
                       toast.success(data.message || 'Email inviata!')
                       setShowForgot(false)
                     } else {
-                      toast.error(data.error || 'Errore nell\'invio')
+                      toast.error(data.error || "Errore nell'invio")
                     }
                   } catch {
-                    toast.error('Errore nell\'invio dell\'email')
+                    toast.error("Errore nell'invio dell'email")
                   } finally {
                     setForgotLoading(false)
                   }
                 }}
                 disabled={forgotLoading}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold py-2 rounded-lg transition-colors text-sm"
+                className="flex-1 rounded-xl bg-[#16a34a] text-white font-semibold py-2.5 text-[14px] transition-all hover:bg-[#15803d] active:scale-[0.98] disabled:opacity-40"
               >
                 {forgotLoading ? 'Invio...' : 'Invia link'}
               </button>
               <button
                 onClick={() => setShowForgot(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 text-sm hover:bg-gray-100 transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-[14px] hover:bg-gray-100 transition-colors"
               >
                 Annulla
               </button>
@@ -210,9 +252,10 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* Resend verification */}
         {showResend && !isSignUp && (
-          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
-            <p className="text-sm text-yellow-800 mb-2">Non hai ricevuto l'email di conferma?</p>
+          <div className="mt-5 p-4 bg-amber-50/80 rounded-2xl border border-amber-200/60 text-center">
+            <p className="text-[13px] text-amber-700 mb-2.5">Non hai ricevuto l'email di conferma?</p>
             <button
               onClick={async () => {
                 setResendLoading(true)
@@ -226,32 +269,42 @@ export default function LoginPage() {
                   if (res.ok) {
                     toast.success(data.message || 'Email inviata!')
                   } else {
-                    toast.error(data.error || 'Errore nell\'invio')
+                    toast.error(data.error || "Errore nell'invio")
                   }
                 } catch {
-                  toast.error('Errore nell\'invio dell\'email')
+                  toast.error("Errore nell'invio dell'email")
                 } finally {
                   setResendLoading(false)
                 }
               }}
               disabled={resendLoading}
-              className="text-sm text-green-600 font-semibold hover:underline disabled:text-gray-400"
+              className="text-[13px] text-green-600 font-semibold hover:text-green-700 transition-colors disabled:text-gray-400"
             >
               {resendLoading ? 'Invio in corso...' : 'Reinvia email di conferma'}
             </button>
           </div>
         )}
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          {isSignUp ? 'Hai gia un account?' : 'Non hai un account?'}{' '}
-          <button
-            onClick={() => { setIsSignUp(!isSignUp); setShowResend(false) }}
-            className="text-green-600 font-semibold hover:underline"
-          >
-            {isSignUp ? 'Accedi' : 'Registrati gratis'}
-          </button>
-        </p>
+        {/* Divider */}
+        <div className="mt-7 mb-5 flex items-center gap-3">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-[12px] text-gray-300 uppercase tracking-widest">oppure</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Toggle login / signup */}
+        <button
+          onClick={() => { setIsSignUp(!isSignUp); setShowResend(false); setShowForgot(false) }}
+          className="w-full rounded-xl border border-gray-200 bg-white py-3 text-[15px] font-semibold text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]"
+        >
+          {isSignUp ? 'Hai un account? Log in' : 'Registrati gratis'}
+        </button>
       </div>
+
+      {/* Footer */}
+      <p className="mt-8 text-[12px] text-white/30 text-center">
+        Trustera - Infrastructure for Digital Trust
+      </p>
     </div>
   )
 }

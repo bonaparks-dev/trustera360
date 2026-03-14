@@ -69,7 +69,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-[#0a2e1f] via-[#0d3d2a] to-[#0a2e1f] flex flex-col items-center justify-center px-5 py-10">
+    <div className="min-h-[100dvh] bg-white flex flex-col items-center justify-center px-5 py-10">
 
       {/* Card */}
       <div
@@ -302,7 +302,7 @@ export default function LoginPage() {
       </div>
 
       {/* Footer */}
-      <p className="mt-8 text-[12px] text-white/30 text-center">
+      <p className="mt-8 text-[12px] text-gray-300 text-center">
         Trustera - Infrastructure for Digital Trust
       </p>
     </div>

@@ -408,7 +408,7 @@ export default function FirmaPage() {
                                 type="checkbox"
                                 checked={acceptedTerms}
                                 onChange={e => setAcceptedTerms(e.target.checked)}
-                                className="mt-1 h-5 w-5 rounded border-gray-300 text-gray-700 focus:ring-gray-500"
+                                className="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                             />
                             <span className="text-sm text-gray-700">
                                 Confermo che i dati inseriti sono corretti e accetto i termini e le condizioni del documento.
@@ -416,12 +416,12 @@ export default function FirmaPage() {
                         </label>
 
                         {existingMarketingConsent !== true && (
-                            <label className="flex items-start gap-3 mb-6 cursor-pointer border border-gray-300 rounded-xl p-4">
+                            <label className="flex items-start gap-3 mb-6 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={acceptedMarketing === true}
                                     onChange={e => setAcceptedMarketing(e.target.checked ? true : false)}
-                                    className="mt-1 h-5 w-5 rounded border-gray-300 text-gray-700 focus:ring-gray-500"
+                                    className="mt-1 h-5 w-5 rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
                                 />
                                 <span className="text-sm text-gray-700">
                                     ACCETTO le condizioni di cui al Contratto gratuito per i servizi di mediazione e tutti i consensi di cui all'<button type="button" onClick={() => setShowMarketingInfo(true)} className="text-gray-700 underline">informativa privacy</button>.

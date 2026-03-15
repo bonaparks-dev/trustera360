@@ -1,18 +1,32 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabaseClient'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
-import PrivacyPage from './pages/PrivacyPage'
-import SignPage from './pages/SignPage'
-import FirmaPage from './pages/FirmaPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
 import type { Session } from '@supabase/supabase-js'
+
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
+const TermsPage = lazy(() => import('./pages/TermsPage'))
+const FeaturesPage = lazy(() => import('./pages/FeaturesPage'))
+const PricingPage = lazy(() => import('./pages/PricingPage'))
+const ApiPage = lazy(() => import('./pages/ApiPage'))
+const SecurityPage = lazy(() => import('./pages/SecurityPage'))
+const SignPage = lazy(() => import('./pages/SignPage'))
+const FirmaPage = lazy(() => import('./pages/FirmaPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 
 function ProtectedRoute({ session, children }: { session: Session | null; children: React.ReactNode }) {
   if (!session) return <Navigate to="/login" replace />
   return <>{children}</>
+}
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+    </div>
+  )
 }
 
 export default function App() {
@@ -35,26 +49,29 @@ export default function App() {
   }, [])
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700"></div>
-      </div>
-    )
+    return <PageLoader />
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-      <Route path="/dashboard" element={
-        <ProtectedRoute session={session}>
-          <DashboardPage session={session!} />
-        </ProtectedRoute>
-      } />
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/sign/:token" element={<SignPage />} />
-      <Route path="/firma/:token" element={<FirmaPage />} />
-    </Routes>
+    <Suspense fallback={<PageLoader />}>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/dashboard" element={
+          <ProtectedRoute session={session}>
+            <DashboardPage session={session!} />
+          </ProtectedRoute>
+        } />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/api" element={<ApiPage />} />
+        <Route path="/security" element={<SecurityPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/sign/:token" element={<SignPage />} />
+        <Route path="/firma/:token" element={<FirmaPage />} />
+      </Routes>
+    </Suspense>
   )
 }

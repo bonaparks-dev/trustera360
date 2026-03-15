@@ -1,27 +1,11 @@
 import { Link } from 'react-router-dom'
+import SiteLayout from '../components/SiteLayout'
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Header */}
-      <header className="border-b border-gray-100">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 max-w-6xl mx-auto">
-          <Link to="/" className="flex items-center shrink-0">
-            <img src="/trustera-logo.jpeg" alt="Trustera" className="h-14 sm:h-20 w-auto" />
-          </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link to="/login" className="text-sm text-gray-500 hover:text-gray-800 transition-colors px-3 sm:px-4 py-2 whitespace-nowrap">
-              Log in
-            </Link>
-            <Link to="/login" className="bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-4 sm:px-6 py-2.5 rounded-lg transition-colors shadow-md shadow-green-600/20 whitespace-nowrap">
-              Inizia Gratis
-            </Link>
-          </div>
-        </div>
-      </header>
-
+    <SiteLayout>
       {/* Hero */}
-      <section className="max-w-3xl mx-auto px-6 pt-24 pb-20 text-center">
+      <section className="max-w-3xl mx-auto px-6 pt-20 sm:pt-24 pb-20 text-center">
         <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-bold leading-[1.1] mb-6 text-[#0d3d2a]">
           Ancora a stampare, firmare e scannerizzare documenti?
         </h1>
@@ -32,7 +16,7 @@ export default function LandingPage() {
           Ogni documento ha <strong className="text-gray-700">Audit Trail certificato</strong>: data, ora, dispositivo e firma registrati.
           <br />Cosi nessuno puo modificare il documento dopo la firma.
         </p>
-        <Link to="/login" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-xl text-lg transition-colors shadow-lg shadow-green-600/25">
+        <Link to="/login" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-xl text-lg transition-all shadow-lg shadow-green-600/25 active:scale-[0.98]">
           Inizia Gratis
         </Link>
       </section>
@@ -56,9 +40,12 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Pricing preview */}
       <section className="max-w-4xl mx-auto px-6 py-20">
-        <h2 className="text-3xl font-bold text-center mb-12 text-[#0d3d2a]">Scegli il tuo piano</h2>
+        <h2 className="text-3xl font-bold text-center mb-4 text-[#0d3d2a]">Scegli il tuo piano</h2>
+        <p className="text-center text-gray-400 mb-12">
+          <Link to="/pricing" className="hover:text-green-600 transition-colors underline underline-offset-4">Vedi tutti i dettagli</Link>
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
             <h3 className="text-2xl font-bold text-green-600 mb-1">Free</h3>
@@ -104,15 +91,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-          <span>Trustera - Infrastructure for Digital Trust</span>
-          <div className="flex gap-6">
-            <Link to="/privacy" className="hover:text-green-600 transition-colors">Privacy & GDPR</Link>
-          </div>
+      {/* Trust bar */}
+      <section className="bg-[#0d3d2a] py-16">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">30 giorni gratis. Nessun rischio.</h2>
+          <p className="text-green-200/70 text-lg mb-8 max-w-xl mx-auto">Prova Trustera gratuitamente e valuta la piattaforma in piena liberta. Nessuna penale, nessun vincolo.</p>
+          <Link to="/login" className="inline-block bg-white text-[#0d3d2a] font-bold py-3.5 px-10 rounded-xl text-lg transition-all hover:bg-green-50 active:scale-[0.98]">
+            Inizia Gratis
+          </Link>
         </div>
-      </footer>
-    </div>
+      </section>
+    </SiteLayout>
   )
 }

@@ -1,6 +1,7 @@
 import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { Resend } from 'resend'
 import crypto from 'crypto'
 
 // Trustera Supabase — primary
@@ -14,6 +15,69 @@ const supabaseDR7 = createClient(
   process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
   process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+const resend = new Resend(process.env.RESEND_API_KEY!)
+
+async function sendSignedPdfEmail(
+  to: string,
+  documentName: string,
+  signerNames: string,
+  pdfUrl: string,
+  isOwner: boolean
+): Promise<void> {
+  try {
+    const subject = isOwner
+      ? `Documento firmato: ${documentName}`
+      : `Hai firmato: ${documentName}`
+
+    const bodyText = isOwner
+      ? `Il documento "${documentName}" è stato firmato da tutti i firmatari (${signerNames}).\n\nScarica il documento firmato:\n${pdfUrl}\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
+      : `Hai firmato il documento "${documentName}".\n\nScarica il documento firmato:\n${pdfUrl}\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
+
+    const bodyHtml = `<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body style="margin:0;padding:0;background:#f9fafb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:32px 40px 0;text-align:center;">
+    <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" style="height:80px;width:auto;max-width:200px;" />
+  </td></tr>
+  <tr><td style="padding:24px 40px 0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;color:#333;line-height:1.6;">
+    ${isOwner
+      ? `<p style="margin:0 0 12px;">Il documento <strong>${documentName}</strong> è stato firmato da tutti i firmatari.</p><p style="margin:0 0 12px;">Firmatari: <strong>${signerNames}</strong></p>`
+      : `<p style="margin:0 0 12px;">Hai firmato il documento <strong>${documentName}</strong>.</p>`}
+    <p style="margin:0;">Clicca il pulsante qui sotto per scaricare il documento firmato:</p>
+  </td></tr>
+  <tr><td style="padding:28px 40px;text-align:center;">
+    <a href="${pdfUrl}" style="display:inline-block;background-color:#16a34a;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px;">
+      Scarica PDF Firmato
+    </a>
+  </td></tr>
+  <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+  <tr><td style="padding:24px 40px 32px;text-align:center;">
+    <p style="margin:0;color:#d1d5db;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:11px;">
+      Trustera - Infrastructure for Digital Trust<br/>
+      <a href="https://trustera360.app" style="color:#16a34a;text-decoration:none;">www.trustera360.app</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+
+    await resend.emails.send({
+      from: 'Trustera <info@trustera360.app>',
+      replyTo: 'info@trustera360.app',
+      to,
+      subject,
+      text: bodyText,
+      html: bodyHtml,
+    })
+    console.log('[trustera-sign-complete] Signed PDF email sent to:', to)
+  } catch (err: any) {
+    console.warn('[trustera-sign-complete] Email send failed for', to, ':', err.message)
+  }
+}
 
 function cleanPhoneForChatId(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, '')
@@ -471,10 +535,23 @@ export const handler: Handler = async (event) => {
         console.warn('[trustera-sign-complete] signed_documents_log insert failed:', logErr.message)
       }
 
-      // Send signed PDF via WhatsApp to all signers who have phones
+      // Send signed PDF to sender (document owner) via email
+      if (doc.owner_id) {
+        const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
+        if (ownerUser?.email) {
+          const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
+          await sendSignedPdfEmail(ownerUser.email, doc.name, signerNamesList, publicUrl, true)
+        }
+      }
+
+      // Send signed PDF to each signer via their chosen channel
       for (const s of allSigners) {
         if (s.signer_phone) {
+          // Try WhatsApp first if they have a phone
           await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
+        } else {
+          // Fallback: send via email
+          await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, publicUrl, false)
         }
       }
 
@@ -599,7 +676,15 @@ export const handler: Handler = async (event) => {
     // Save marketing consent
     await saveMarketingConsent(doc.signer_email, doc.signer_name, marketingConsent ?? false, 'signing_complete_legacy')
 
-    // Send signed PDF via WhatsApp if phone available
+    // Send signed PDF to sender (document owner) via email
+    if (doc.owner_id) {
+      const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
+      if (ownerUser?.email) {
+        await sendSignedPdfEmail(ownerUser.email, doc.name, doc.signer_name, publicUrl, true)
+      }
+    }
+
+    // Send signed PDF to signer via WhatsApp or email
     let signerPhone = doc.signer_phone || ''
     if (!signerPhone && doc.signer_email) {
       const { data: customer } = await supabaseDR7
@@ -612,6 +697,8 @@ export const handler: Handler = async (event) => {
 
     if (signerPhone) {
       await sendWhatsAppPdf(signerPhone, publicUrl, doc.name, doc.signer_name)
+    } else {
+      await sendSignedPdfEmail(doc.signer_email, doc.name, doc.signer_name, publicUrl, false)
     }
 
     console.log('[trustera-sign-complete] Legacy signing complete for doc:', doc.id)

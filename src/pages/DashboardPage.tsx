@@ -6,16 +6,6 @@ import type { Session } from '@supabase/supabase-js'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface SignerRaw {
-  id: string
-  document_id: string
-  signer_name: string
-  signer_email: string
-  signer_phone?: string | null
-  status: 'pending' | 'signed'
-  signed_at?: string | null
-}
-
 interface Signer {
   id: string
   document_id: string

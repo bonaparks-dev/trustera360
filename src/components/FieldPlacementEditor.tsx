@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
-import 'react-pdf/dist/esm/Page/TextLayer.css'
 import { FIELD_TYPES, SIGNER_COLORS } from '../types/fields'
 import type { FieldType, DocumentField } from '../types/fields'
 

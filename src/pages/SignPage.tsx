@@ -14,6 +14,7 @@ export default function SignPage() {
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null)
   const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
@@ -63,7 +64,7 @@ export default function SignPage() {
       setOtp(['', '', '', '', '', ''])
       setTimeout(() => otpRefs.current[0]?.focus(), 100)
     } catch {
-      setError('Errore nell\'invio del codice')
+      setError("Errore nell'invio del codice")
       setStatus('viewing')
     }
   }
@@ -95,7 +96,7 @@ export default function SignPage() {
       const res = await fetch('/.netlify/functions/trustera-sign-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
+        body: JSON.stringify({ token, marketingConsent })
       })
       if (!res.ok) { const err = await res.json(); setError(err.error); return }
       const data = await res.json()
@@ -131,7 +132,7 @@ export default function SignPage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600" />
       </div>
     )
   }
@@ -160,10 +161,9 @@ export default function SignPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
-        <div className="flex items-center">
-          <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 w-auto" />
-        </div>
+        <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 w-auto" />
         <span className="text-sm text-gray-400">Firma Elettronica</span>
       </div>
 
@@ -174,7 +174,7 @@ export default function SignPage() {
           <p className="text-sm text-gray-500">Firmatario: {signerName}</p>
         </div>
 
-        {/* PDF viewer — Google Docs Viewer for full multi-page support */}
+        {/* PDF viewer */}
         {pdfUrl && status !== 'signed' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
             <iframe
@@ -186,14 +186,21 @@ export default function SignPage() {
           </div>
         )}
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-6 text-sm">{error}</div>}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-6 text-sm">
+            {error}
+          </div>
+        )}
 
         {/* Step 1: Request OTP */}
         {status === 'viewing' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
             <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Documento</h2>
             <p className="text-gray-600 text-sm mb-6">Invieremo un codice di verifica via WhatsApp o email.</p>
-            <button onClick={handleRequestOtp} className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg">
+            <button
+              onClick={handleRequestOtp}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+            >
               Invia Codice di Verifica
             </button>
           </div>
@@ -201,7 +208,7 @@ export default function SignPage() {
 
         {status === 'otp_sending' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-4" />
             <p className="text-gray-600">Invio codice di verifica...</p>
           </div>
         )}
@@ -230,28 +237,79 @@ export default function SignPage() {
               ))}
             </div>
             <div className="flex flex-col gap-3 items-center">
-              <button onClick={handleVerifyOtp} disabled={otp.join('').length !== 6 || status === 'otp_verifying'} className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 px-8 rounded-lg transition-colors w-full max-w-xs">
+              <button
+                onClick={handleVerifyOtp}
+                disabled={otp.join('').length !== 6 || status === 'otp_verifying'}
+                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 px-8 rounded-lg transition-colors w-full max-w-xs"
+              >
                 {status === 'otp_verifying' ? 'Verifica...' : 'Verifica Codice'}
               </button>
-              <button onClick={handleRequestOtp} className="text-sm text-gray-500 hover:text-gray-700">Invia di nuovo</button>
+              <button onClick={handleRequestOtp} className="text-sm text-gray-500 hover:text-gray-700">
+                Invia di nuovo
+              </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Confirm */}
+        {/* Step 3: Confirm + marketing consent */}
         {status === 'signing' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-800 mb-4 text-center">Conferma Firma</h2>
             <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 mb-6 text-sm text-green-700 text-center">
               Identita verificata con successo
             </div>
+
+            {/* Terms */}
             <label className="flex items-start gap-3 mb-6 cursor-pointer">
-              <input type="checkbox" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} className="mt-1 h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500" />
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={e => setAcceptedTerms(e.target.checked)}
+                className="mt-1 h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+              />
               <span className="text-sm text-gray-700">
                 Confermo che i dati sono corretti e accetto di firmare elettronicamente questo documento.
               </span>
             </label>
-            <button onClick={handleSign} disabled={!acceptedTerms} className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg">
+
+            {/* Marketing consent */}
+            <div className="border border-gray-200 rounded-xl p-4 mb-6 bg-gray-50/50">
+              <p className="text-sm font-medium text-gray-700 mb-2">Consenso Marketing</p>
+              <p className="text-xs text-gray-500 mb-3">
+                Acconsento al trattamento dei miei dati personali per finalita di marketing e comunicazioni promozionali
+                da parte di Trustera e dei suoi partner.
+              </p>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="marketing"
+                    value="yes"
+                    checked={marketingConsent === true}
+                    onChange={() => setMarketingConsent(true)}
+                    className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
+                  />
+                  <span className="text-sm text-gray-700">Si</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="marketing"
+                    value="no"
+                    checked={marketingConsent === false}
+                    onChange={() => setMarketingConsent(false)}
+                    className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
+                  />
+                  <span className="text-sm text-gray-700">No</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              onClick={handleSign}
+              disabled={!acceptedTerms}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg"
+            >
               Firma il Documento
             </button>
           </div>
@@ -262,14 +320,28 @@ export default function SignPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
             <h2 className="text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
             <p className="text-gray-600 mb-6">
-              {signedAt ? `Firmato il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : 'Firma completata.'}
+              {signedAt
+                ? `Firmato il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`
+                : 'Firma completata.'
+              }
             </p>
             {signedPdfUrl && (
-              <a href={signedPdfUrl} target="_blank" rel="noreferrer" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors">
+              <a
+                href={signedPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
+              >
                 Scarica Documento Firmato
               </a>
             )}
-            <p className="text-xs text-gray-400 mt-6">Firma documenti in pochi secondi — <a href="https://trustera360.app" className="text-green-600 hover:underline">www.trustera360.app</a> — tutto gratuito.</p>
+            <p className="text-xs text-gray-400 mt-6">
+              Firma documenti in pochi secondi —{' '}
+              <a href="https://trustera360.app" className="text-green-600 hover:underline">
+                www.trustera360.app
+              </a>{' '}
+              — tutto gratuito.
+            </p>
           </div>
         )}
       </div>

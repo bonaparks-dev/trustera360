@@ -4,99 +4,59 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
+  process.env.SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
-export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
+const SITE_URL = process.env.SITE_URL || 'https://trustera360.app'
+
+function cleanPhone(phone: string): string {
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '')
+  if (cleaned.startsWith('+')) return cleaned.slice(1) // return without + for chatId
+  if (cleaned.startsWith('00')) return cleaned.slice(2)
+  if (cleaned.startsWith('3') && cleaned.length === 10) return '39' + cleaned
+  return cleaned
+}
+
+async function sendWhatsAppSigningLink(
+  phone: string,
+  signerName: string,
+  senderName: string,
+  documentName: string,
+  signingUrl: string
+): Promise<boolean> {
+  const idInstance = process.env.GREEN_API_INSTANCE_ID
+  const apiToken = process.env.GREEN_API_TOKEN
+  if (!idInstance || !apiToken) return false
+
+  const chatId = cleanPhone(phone) + '@c.us'
+  const url = `https://api.green-api.com/waInstance${idInstance}/sendMessage/${apiToken}`
 
   try {
-    const { documentId } = JSON.parse(event.body || '{}')
-    if (!documentId) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'documentId richiesto' }) }
-    }
-
-    const { data: doc, error: docError } = await supabase
-      .from('trustera_documents')
-      .select('*')
-      .eq('id', documentId)
-      .single()
-
-    if (docError || !doc) {
-      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
-    }
-
-    // Generate signing token
-    const token = crypto.randomBytes(32).toString('hex')
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
-
-    const { error: updateError } = await supabase
-      .from('trustera_documents')
-      .update({
-        signing_token: token,
-        signing_token_expires_at: expiresAt,
-        status: 'pending'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chatId,
+        message: `Ciao ${signerName},\n\n*${senderName}* ti ha inviato un documento da firmare: *${documentName}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
       })
-      .eq('id', documentId)
-
-    if (updateError) throw updateError
-
-    // Get sender name from auth user
-    let senderName = 'Un utente Trustera'
-    if (doc.owner_id) {
-      const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
-      if (ownerUser?.user_metadata?.full_name) {
-        senderName = ownerUser.user_metadata.full_name
-      } else if (ownerUser?.email) {
-        senderName = ownerUser.email
-      }
+    })
+    const data = await res.json()
+    if (res.ok && data.idMessage) {
+      console.log('[trustera-send-signing] WhatsApp sent:', data.idMessage)
+      return true
     }
+    console.warn('[trustera-send-signing] WhatsApp response not OK:', data)
+    return false
+  } catch (err: any) {
+    console.warn('[trustera-send-signing] WhatsApp error:', err.message)
+    return false
+  }
+}
 
-    const signingUrl = `${process.env.SITE_URL || 'https://trustera360.app'}/sign/${token}`
-
-    // Send signing link via WhatsApp if phone is available
-    const signerPhone = doc.signer_phone || ''
-    const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
-    const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
-
-    if (signerPhone && GREEN_API_INSTANCE_ID && GREEN_API_TOKEN) {
-      try {
-        let cleanPhone = signerPhone.replace(/[\s\-\+\(\)]/g, '')
-        if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
-        if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
-
-        const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendMessage/${GREEN_API_TOKEN}`
-        const waResponse = await fetch(greenApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chatId: `${cleanPhone}@c.us`,
-            message: `Ciao ${doc.signer_name},\n\n*${senderName}* ti ha inviato un documento da firmare: *${doc.name}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
-          })
-        })
-        const waResult = await waResponse.json()
-        if (waResponse.ok && !waResult.error) {
-          console.log('[trustera-send-signing] WhatsApp sent:', waResult.idMessage)
-        } else {
-          console.warn('[trustera-send-signing] WhatsApp failed:', waResult)
-        }
-      } catch (waErr: any) {
-        console.warn('[trustera-send-signing] WhatsApp error:', waErr.message)
-      }
-    }
-
-    // Send email to signer
-    await resend.emails.send({
-      from: 'Trustera <info@trustera360.app>',
-      replyTo: 'info@trustera360.app',
-      to: doc.signer_email,
-      subject: `${senderName} ti ha inviato un documento da firmare`,
-      text: `Ciao ${doc.signer_name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
-      html: `<!DOCTYPE html>
+function buildSigningEmailHtml(signerName: string, senderName: string, documentName: string, signingUrl: string): string {
+  return `<!DOCTYPE html>
 <html lang="it" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8" />
@@ -117,8 +77,8 @@ export const handler: Handler = async (event) => {
           </tr>
           <tr>
             <td style="padding: 24px 40px 0; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 15px; color: #333; line-height: 1.6;">
-              <p style="margin: 0 0 12px;">Ciao <strong>${doc.signer_name}</strong>,</p>
-              <p style="margin: 0 0 12px;"><strong>${senderName}</strong> ti ha inviato un documento da firmare: <strong>${doc.name}</strong></p>
+              <p style="margin: 0 0 12px;">Ciao <strong>${signerName}</strong>,</p>
+              <p style="margin: 0 0 12px;"><strong>${senderName}</strong> ti ha inviato un documento da firmare: <strong>${documentName}</strong></p>
               <p style="margin: 0;">Clicca il pulsante qui sotto per visualizzare e firmare il documento:</p>
             </td>
           </tr>
@@ -153,14 +113,165 @@ export const handler: Handler = async (event) => {
   </table>
 </body>
 </html>`
-    })
+}
+
+export const handler: Handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
+  }
+
+  try {
+    const { documentId, signers } = JSON.parse(event.body || '{}')
+
+    if (!documentId) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'documentId richiesto' }) }
+    }
+    if (!Array.isArray(signers) || signers.length === 0) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'signers richiesto (array non vuoto)' }) }
+    }
+
+    // Validate each signer has at least name + email
+    for (const s of signers) {
+      if (!s.name || !s.email) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Ogni firmatario deve avere name e email' }) }
+      }
+    }
+
+    // Fetch document
+    const { data: doc, error: docError } = await supabase
+      .from('trustera_documents')
+      .select('*')
+      .eq('id', documentId)
+      .single()
+
+    if (docError || !doc) {
+      console.error('[trustera-send-signing] Document not found:', docError?.message)
+      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
+    }
+
+    // Get sender name from document owner's auth profile
+    let senderName = 'Un utente Trustera'
+    if (doc.owner_id) {
+      const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
+      if (ownerUser?.user_metadata?.full_name) {
+        senderName = ownerUser.user_metadata.full_name
+      } else if (ownerUser?.email) {
+        senderName = ownerUser.email
+      }
+    }
+
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+
+    // Process each signer
+    for (const signer of signers) {
+      const token = crypto.randomBytes(32).toString('hex')
+      const signingUrl = `${SITE_URL}/sign/${token}`
+
+      // Insert signer record into trustera_document_signers
+      const { error: signerInsertError } = await supabase
+        .from('trustera_document_signers')
+        .insert({
+          document_id: documentId,
+          signer_name: signer.name,
+          signer_email: signer.email,
+          signer_phone: signer.phone || null,
+          signing_token: token,
+          signing_token_expires_at: expiresAt,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        })
+
+      if (signerInsertError) {
+        console.error('[trustera-send-signing] Failed to insert signer:', signerInsertError.message)
+        throw signerInsertError
+      }
+
+      // Upsert into trustera_contacts (by owner_id + email)
+      if (doc.owner_id) {
+        const { error: contactError } = await supabase
+          .from('trustera_contacts')
+          .upsert(
+            {
+              owner_id: doc.owner_id,
+              email: signer.email,
+              name: signer.name,
+              phone: signer.phone || null,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'owner_id,email' }
+          )
+        if (contactError) {
+          console.warn('[trustera-send-signing] Contact upsert failed:', contactError.message)
+        }
+      }
+
+      // Upsert into trustera_leads (by email, never overwrite marketing_consent=true with false)
+      const { data: existingLead } = await supabase
+        .from('trustera_leads')
+        .select('id, marketing_consent')
+        .eq('email', signer.email)
+        .maybeSingle()
+
+      const leadPayload: Record<string, any> = {
+        email: signer.email,
+        name: signer.name,
+        phone: signer.phone || null,
+        last_seen_at: new Date().toISOString(),
+        source: 'signing_request'
+      }
+
+      // Never downgrade marketing_consent from true to false
+      if (!existingLead || existingLead.marketing_consent !== true) {
+        leadPayload.marketing_consent = false
+      }
+
+      const { error: leadError } = await supabase
+        .from('trustera_leads')
+        .upsert(leadPayload, { onConflict: 'email' })
+
+      if (leadError) {
+        console.warn('[trustera-send-signing] Lead upsert failed:', leadError.message)
+      }
+
+      // Send WhatsApp if phone provided
+      if (signer.phone) {
+        await sendWhatsAppSigningLink(signer.phone, signer.name, senderName, doc.name, signingUrl)
+      }
+
+      // Send email via Resend
+      try {
+        await resend.emails.send({
+          from: 'Trustera <info@trustera360.app>',
+          replyTo: 'info@trustera360.app',
+          to: signer.email,
+          subject: `${senderName} ti ha inviato un documento da firmare`,
+          text: `Ciao ${signer.name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+          html: buildSigningEmailHtml(signer.name, senderName, doc.name, signingUrl)
+        })
+      } catch (emailErr: any) {
+        console.error('[trustera-send-signing] Email send failed for', signer.email, ':', emailErr.message)
+        throw emailErr
+      }
+
+      console.log('[trustera-send-signing] Signer processed:', signer.email)
+    }
+
+    // Update document status to pending
+    const { error: statusError } = await supabase
+      .from('trustera_documents')
+      .update({ status: 'pending' })
+      .eq('id', documentId)
+
+    if (statusError) {
+      console.error('[trustera-send-signing] Status update failed:', statusError.message)
+    }
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true })
+      body: JSON.stringify({ success: true, signerCount: signers.length })
     }
   } catch (error: any) {
-    console.error('Error sending signing request:', error)
+    console.error('[trustera-send-signing] Error:', error)
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message || 'Errore interno' })

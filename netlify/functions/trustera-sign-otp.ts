@@ -4,17 +4,17 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
+  process.env.SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
-function cleanPhone(phone: string): string {
+function cleanPhoneForChatId(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, '')
-  if (cleaned.startsWith('+')) return cleaned
-  if (cleaned.startsWith('00')) return '+' + cleaned.slice(2)
-  if (cleaned.startsWith('3') && cleaned.length === 10) return '+39' + cleaned
-  return '+' + cleaned
+  if (cleaned.startsWith('+')) return cleaned.slice(1)
+  if (cleaned.startsWith('00')) return cleaned.slice(2)
+  if (cleaned.startsWith('3') && cleaned.length === 10) return '39' + cleaned
+  return cleaned
 }
 
 async function sendWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
@@ -22,7 +22,7 @@ async function sendWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
   const apiToken = process.env.GREEN_API_TOKEN
   if (!idInstance || !apiToken) return false
 
-  const chatId = phone.replace('+', '') + '@c.us'
+  const chatId = cleanPhoneForChatId(phone) + '@c.us'
   const url = `https://api.green-api.com/waInstance${idInstance}/sendMessage/${apiToken}`
 
   try {
@@ -36,78 +36,14 @@ async function sendWhatsAppOtp(phone: string, otp: string): Promise<boolean> {
     })
     const data = await res.json()
     return !!data.idMessage
-  } catch {
+  } catch (err: any) {
+    console.warn('[trustera-sign-otp] WhatsApp send error:', err.message)
     return false
   }
 }
 
-export const handler: Handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
-  }
-
-  try {
-    const { token } = JSON.parse(event.body || '{}')
-    if (!token) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Token richiesto' }) }
-    }
-
-    const { data: doc, error } = await supabase
-      .from('trustera_documents')
-      .select('*')
-      .eq('signing_token', token)
-      .single()
-
-    if (error || !doc) {
-      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
-    }
-
-    if (doc.signing_token_expires_at && new Date(doc.signing_token_expires_at) < new Date()) {
-      return { statusCode: 410, body: JSON.stringify({ error: 'Link scaduto' }) }
-    }
-
-    // Generate 6-digit OTP
-    const otp = crypto.randomInt(100000, 1000000).toString()
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 min
-
-    const { error: otpUpdateError } = await supabase
-      .from('trustera_documents')
-      .update({ otp_code: otp, otp_expires_at: otpExpires })
-      .eq('id', doc.id)
-
-    if (otpUpdateError) {
-      console.error('[trustera-sign-otp] OTP update failed:', otpUpdateError)
-      return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio del codice' }) }
-    }
-
-    // Try WhatsApp first, fallback to email
-    let channel: 'whatsapp' | 'email' = 'email'
-    let signerPhone = doc.signer_phone || ''
-
-    // If no phone on document, look up customers_extended
-    if (!signerPhone && doc.signer_email) {
-      const { data: customer } = await supabase
-        .from('customers_extended')
-        .select('telefono')
-        .eq('email', doc.signer_email)
-        .maybeSingle()
-      if (customer?.telefono) signerPhone = customer.telefono
-    }
-
-    if (signerPhone) {
-      const phone = cleanPhone(signerPhone)
-      const sent = await sendWhatsAppOtp(phone, otp)
-      if (sent) channel = 'whatsapp'
-    }
-
-    if (channel === 'email') {
-      await resend.emails.send({
-        from: 'Trustera <info@trustera360.app>',
-        replyTo: 'info@trustera360.app',
-        to: doc.signer_email,
-        subject: 'Codice di verifica Trustera',
-        text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
-        html: `<!DOCTYPE html>
+function buildOtpEmailHtml(otp: string): string {
+  return `<!DOCTYPE html>
 <html lang="it" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8" />
@@ -161,18 +97,130 @@ export const handler: Handler = async (event) => {
   </table>
 </body>
 </html>`
+}
+
+export const handler: Handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
+  }
+
+  try {
+    const { token } = JSON.parse(event.body || '{}')
+    if (!token) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Token richiesto' }) }
+    }
+
+    const otp = crypto.randomInt(100000, 1000000).toString()
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000).toISOString()
+
+    // --- Try trustera_document_signers first (new multi-signer flow) ---
+    const { data: signerRow, error: signerError } = await supabase
+      .from('trustera_document_signers')
+      .select('*')
+      .eq('signing_token', token)
+      .maybeSingle()
+
+    if (signerError) {
+      console.error('[trustera-sign-otp] Signer lookup error:', signerError.message)
+    }
+
+    if (signerRow) {
+      // Check expiration
+      if (signerRow.signing_token_expires_at && new Date(signerRow.signing_token_expires_at) < new Date()) {
+        return { statusCode: 410, body: JSON.stringify({ error: 'Link scaduto' }) }
+      }
+
+      // Save OTP to signer record
+      const { error: otpUpdateError } = await supabase
+        .from('trustera_document_signers')
+        .update({ otp_code: otp, otp_expires_at: otpExpires })
+        .eq('id', signerRow.id)
+
+      if (otpUpdateError) {
+        console.error('[trustera-sign-otp] OTP update failed (signers):', otpUpdateError.message)
+        return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio del codice' }) }
+      }
+
+      // Try WhatsApp first, fallback to email
+      let channel: 'whatsapp' | 'email' = 'email'
+      const signerPhone = signerRow.signer_phone || ''
+
+      if (signerPhone) {
+        const sent = await sendWhatsAppOtp(signerPhone, otp)
+        if (sent) channel = 'whatsapp'
+      }
+
+      if (channel === 'email') {
+        await resend.emails.send({
+          from: 'Trustera <info@trustera360.app>',
+          replyTo: 'info@trustera360.app',
+          to: signerRow.signer_email,
+          subject: 'Codice di verifica Trustera',
+          text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+          html: buildOtpEmailHtml(otp)
+        })
+      }
+
+      return { statusCode: 200, body: JSON.stringify({ success: true, channel }) }
+    }
+
+    // --- Fallback: trustera_documents by signing_token (old single-signer flow) ---
+    const { data: doc, error: docError } = await supabase
+      .from('trustera_documents')
+      .select('*')
+      .eq('signing_token', token)
+      .maybeSingle()
+
+    if (docError) {
+      console.error('[trustera-sign-otp] Document lookup error:', docError.message)
+    }
+
+    if (!doc) {
+      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
+    }
+
+    // Check expiration
+    if (doc.signing_token_expires_at && new Date(doc.signing_token_expires_at) < new Date()) {
+      return { statusCode: 410, body: JSON.stringify({ error: 'Link scaduto' }) }
+    }
+
+    // Save OTP to document record
+    const { error: otpUpdateError } = await supabase
+      .from('trustera_documents')
+      .update({ otp_code: otp, otp_expires_at: otpExpires })
+      .eq('id', doc.id)
+
+    if (otpUpdateError) {
+      console.error('[trustera-sign-otp] OTP update failed (documents):', otpUpdateError.message)
+      return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio del codice' }) }
+    }
+
+    // Try WhatsApp first, fallback to email
+    let channel: 'whatsapp' | 'email' = 'email'
+    const signerPhone = doc.signer_phone || ''
+
+    if (signerPhone) {
+      const sent = await sendWhatsAppOtp(signerPhone, otp)
+      if (sent) channel = 'whatsapp'
+    }
+
+    if (channel === 'email') {
+      await resend.emails.send({
+        from: 'Trustera <info@trustera360.app>',
+        replyTo: 'info@trustera360.app',
+        to: doc.signer_email,
+        subject: 'Codice di verifica Trustera',
+        text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+        html: buildOtpEmailHtml(otp)
       })
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, channel })
-    }
+    return { statusCode: 200, body: JSON.stringify({ success: true, channel }) }
   } catch (error: any) {
-    console.error('Error sending OTP:', error)
+    console.error('[trustera-sign-otp] Error:', error)
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: error.message || 'Errore nell\'invio del codice' })
+      body: JSON.stringify({ error: error.message || "Errore nell'invio del codice" })
     }
   }
 }

@@ -2,7 +2,7 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
+  process.env.SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
@@ -19,52 +19,93 @@ export const handler: Handler = async (event) => {
 
     console.log('[trustera-sign-verify] Looking up token:', token.substring(0, 8) + '...')
 
-    const { data: doc, error } = await supabase
+    // --- Try trustera_document_signers first (new multi-signer flow) ---
+    const { data: signerRow, error: signerError } = await supabase
+      .from('trustera_document_signers')
+      .select('*')
+      .eq('signing_token', token)
+      .maybeSingle()
+
+    if (signerError) {
+      console.error('[trustera-sign-verify] Signer lookup error:', signerError.message, signerError.code)
+    }
+
+    if (signerRow) {
+      console.log('[trustera-sign-verify] Found signer row:', signerRow.id, 'email:', signerRow.signer_email, 'otp_code:', signerRow.otp_code ? 'SET' : 'NULL', 'otp_expires_at:', signerRow.otp_expires_at)
+
+      // Check OTP expiration
+      if (signerRow.otp_expires_at && new Date(signerRow.otp_expires_at) < new Date()) {
+        console.log('[trustera-sign-verify] OTP expired for signer:', signerRow.id)
+        return { statusCode: 400, body: JSON.stringify({ error: 'Codice scaduto. Richiedi un nuovo codice.' }) }
+      }
+
+      // Verify OTP
+      if (signerRow.otp_code !== otp) {
+        console.log('[trustera-sign-verify] OTP mismatch for signer:', signerRow.id, 'expected:', signerRow.otp_code ? 'exists' : 'NULL', 'got:', otp)
+        return { statusCode: 400, body: JSON.stringify({ error: 'Codice non valido' }) }
+      }
+
+      // Mark OTP as verified, clear code
+      const { error: updateError } = await supabase
+        .from('trustera_document_signers')
+        .update({ otp_verified: true, otp_code: null })
+        .eq('id', signerRow.id)
+
+      if (updateError) {
+        console.error('[trustera-sign-verify] Update failed (signers):', updateError.message, updateError.code, updateError.details)
+        return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio della verifica' }) }
+      }
+
+      console.log('[trustera-sign-verify] OTP verified for signer:', signerRow.id)
+      return { statusCode: 200, body: JSON.stringify({ success: true }) }
+    }
+
+    // --- Fallback: trustera_documents by signing_token (old single-signer flow) ---
+    const { data: doc, error: docError } = await supabase
       .from('trustera_documents')
       .select('*')
       .eq('signing_token', token)
-      .single()
+      .maybeSingle()
 
-    if (error) {
-      console.error('[trustera-sign-verify] Supabase error:', error.message, error.code, error.details)
-      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato', debug: error.message }) }
+    if (docError) {
+      console.error('[trustera-sign-verify] Document lookup error:', docError.message, docError.code, docError.details)
+      return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato', debug: docError.message }) }
     }
 
     if (!doc) {
-      console.error('[trustera-sign-verify] No document found for token')
+      console.error('[trustera-sign-verify] No document or signer found for token')
       return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
     }
 
-    console.log('[trustera-sign-verify] Found doc:', doc.id, 'otp_code:', doc.otp_code ? 'SET' : 'NULL', 'otp_expires_at:', doc.otp_expires_at)
+    console.log('[trustera-sign-verify] Found doc (legacy):', doc.id, 'otp_code:', doc.otp_code ? 'SET' : 'NULL', 'otp_expires_at:', doc.otp_expires_at)
 
     // Check OTP expiration
     if (doc.otp_expires_at && new Date(doc.otp_expires_at) < new Date()) {
+      console.log('[trustera-sign-verify] OTP expired for doc:', doc.id)
       return { statusCode: 400, body: JSON.stringify({ error: 'Codice scaduto. Richiedi un nuovo codice.' }) }
     }
 
     // Verify OTP
     if (doc.otp_code !== otp) {
-      console.log('[trustera-sign-verify] OTP mismatch. Expected:', doc.otp_code ? 'exists' : 'NULL', 'Got:', otp)
+      console.log('[trustera-sign-verify] OTP mismatch for doc:', doc.id, 'expected:', doc.otp_code ? 'exists' : 'NULL', 'got:', otp)
       return { statusCode: 400, body: JSON.stringify({ error: 'Codice non valido' }) }
     }
 
-    // Mark OTP as verified
+    // Mark OTP as verified, clear code
     const { error: updateError } = await supabase
       .from('trustera_documents')
       .update({ otp_verified: true, otp_code: null })
       .eq('id', doc.id)
 
     if (updateError) {
-      console.error('[trustera-sign-verify] Update failed:', updateError.message)
+      console.error('[trustera-sign-verify] Update failed (documents):', updateError.message, updateError.code, updateError.details)
       return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio della verifica' }) }
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true })
-    }
+    console.log('[trustera-sign-verify] OTP verified for doc (legacy):', doc.id)
+    return { statusCode: 200, body: JSON.stringify({ success: true }) }
   } catch (error: any) {
-    console.error('[trustera-sign-verify] Error:', error)
+    console.error('[trustera-sign-verify] Unexpected error:', error)
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message || 'Errore nella verifica' })

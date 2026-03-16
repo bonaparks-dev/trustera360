@@ -2,9 +2,16 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient(
-  process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
+  process.env.SUPABASE_URL || 'https://zkcvsewfqnukdkvcairk.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+async function createSignedStorageUrl(rawUrl: string): Promise<string> {
+  const match = rawUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
+  if (!match) return rawUrl
+  const { data } = await supabase.storage.from('trustera').createSignedUrl(match[1], 3600)
+  return data?.signedUrl || rawUrl
+}
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -17,13 +24,79 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Token richiesto' }) }
     }
 
-    const { data: doc, error } = await supabase
+    // --- Try trustera_document_signers first (new multi-signer flow) ---
+    const { data: signerRow, error: signerError } = await supabase
+      .from('trustera_document_signers')
+      .select('*, trustera_documents(*)')
+      .eq('signing_token', token)
+      .maybeSingle()
+
+    if (signerError) {
+      console.error('[trustera-sign-get] Signer lookup error:', signerError.message)
+    }
+
+    if (signerRow) {
+      const doc = signerRow.trustera_documents as Record<string, any>
+
+      if (!doc) {
+        return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
+      }
+
+      // Check expiration
+      if (signerRow.signing_token_expires_at && new Date(signerRow.signing_token_expires_at) < new Date()) {
+        return { statusCode: 410, body: JSON.stringify({ error: 'Link scaduto' }) }
+      }
+
+      // Generate signed URL for original PDF
+      const pdfUrl = doc.pdf_url ? await createSignedStorageUrl(doc.pdf_url) : null
+
+      // Generate signed URL for signed PDF if document is fully signed
+      let signedPdfUrl: string | undefined
+      if (doc.signed_pdf_url) {
+        signedPdfUrl = await createSignedStorageUrl(doc.signed_pdf_url)
+      }
+
+      // Fetch all signers for this document (for status overview)
+      const { data: allSignersRows } = await supabase
+        .from('trustera_document_signers')
+        .select('signer_name, status, signed_at')
+        .eq('document_id', doc.id)
+        .order('created_at', { ascending: true })
+
+      const allSigners = (allSignersRows || []).map((s: any) => ({
+        name: s.signer_name,
+        status: s.status,
+        signed_at: s.signed_at || null
+      }))
+
+      const response: Record<string, any> = {
+        signerName: signerRow.signer_name,
+        documentName: doc.name,
+        pdfUrl,
+        status: signerRow.status,
+        allSigners
+      }
+
+      if (signerRow.status === 'signed') {
+        response.signedPdfUrl = signedPdfUrl
+        response.signedAt = signerRow.signed_at
+      }
+
+      return { statusCode: 200, body: JSON.stringify(response) }
+    }
+
+    // --- Fallback: trustera_documents by signing_token (old single-signer flow) ---
+    const { data: doc, error: docError } = await supabase
       .from('trustera_documents')
       .select('*')
       .eq('signing_token', token)
-      .single()
+      .maybeSingle()
 
-    if (error || !doc) {
+    if (docError) {
+      console.error('[trustera-sign-get] Document lookup error:', docError.message)
+    }
+
+    if (!doc) {
       return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
     }
 
@@ -32,24 +105,15 @@ export const handler: Handler = async (event) => {
       return { statusCode: 410, body: JSON.stringify({ error: 'Link scaduto' }) }
     }
 
-    // Generate signed URL for the PDF (public URLs don't work if bucket isn't public)
-    let pdfUrl = doc.pdf_url
-    const trusteraMatch = doc.pdf_url?.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
-    if (trusteraMatch) {
-      const { data: signedData } = await supabase.storage.from('trustera').createSignedUrl(trusteraMatch[1], 3600)
-      if (signedData?.signedUrl) pdfUrl = signedData.signedUrl
-    }
+    // Generate signed URL for original PDF
+    const pdfUrl = doc.pdf_url ? await createSignedStorageUrl(doc.pdf_url) : null
 
-    let signedPdfUrl = doc.signed_pdf_url
+    let signedPdfUrl: string | undefined
     if (doc.signed_pdf_url) {
-      const signedMatch = doc.signed_pdf_url.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
-      if (signedMatch) {
-        const { data: signedData } = await supabase.storage.from('trustera').createSignedUrl(signedMatch[1], 3600)
-        if (signedData?.signedUrl) signedPdfUrl = signedData.signedUrl
-      }
+      signedPdfUrl = await createSignedStorageUrl(doc.signed_pdf_url)
     }
 
-    const response: any = {
+    const response: Record<string, any> = {
       signerName: doc.signer_name,
       documentName: doc.name,
       pdfUrl,
@@ -61,12 +125,9 @@ export const handler: Handler = async (event) => {
       response.signedAt = doc.signed_at
     }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(response)
-    }
+    return { statusCode: 200, body: JSON.stringify(response) }
   } catch (error: any) {
-    console.error('Error getting document:', error)
+    console.error('[trustera-sign-get] Error:', error)
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message || 'Errore interno' })

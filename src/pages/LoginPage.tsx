@@ -10,7 +10,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [marketingConsent, setMarketingConsent] = useState(false)
   const [loading, setLoading] = useState(false)
   const [showResend, setShowResend] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
@@ -38,7 +37,7 @@ export default function LoginPage() {
         const res = await fetch('/.netlify/functions/trustera-signup', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, fullName, marketingConsent })
+          body: JSON.stringify({ email, password, fullName })
         })
 
         const data = await res.json()
@@ -51,7 +50,6 @@ export default function LoginPage() {
         setIsSignUp(false)
         setPassword('')
         setFullName('')
-        setMarketingConsent(false)
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
         if (error) {
@@ -178,30 +176,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Marketing consent + terms — signup only */}
-          {isSignUp && (
-            <div className="space-y-4">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={marketingConsent}
-                  onChange={e => setMarketingConsent(e.target.checked)}
-                  className="mt-0.5 h-[18px] w-[18px] rounded-md border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
-                />
-                <span className="text-[13px] text-gray-600 leading-snug">
-                  Desidero ricevere aggiornamenti via email, inclusi suggerimenti, consigli e le ultime novità di Trustera.
-                </span>
-              </label>
-              <p className="text-[13px] text-gray-500 leading-snug">
-                Continuando, accetti i{' '}
-                <a href="/terms" className="text-green-600 underline hover:text-green-700">Termini e Condizioni</a>
-                {' '}e l&apos;
-                <a href="/privacy" className="text-green-600 underline hover:text-green-700">Informativa sulla privacy</a>
-                {' '}di Trustera.
-              </p>
-            </div>
-          )}
-
           {/* Submit */}
           <button
             type="submit"
@@ -320,7 +294,7 @@ export default function LoginPage() {
 
         {/* Toggle login / signup */}
         <button
-          onClick={() => { setIsSignUp(!isSignUp); setShowResend(false); setShowForgot(false); setMarketingConsent(false) }}
+          onClick={() => { setIsSignUp(!isSignUp); setShowResend(false); setShowForgot(false) }}
           className="w-full rounded-xl border border-gray-200 bg-white py-3 text-[15px] font-semibold text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98]"
         >
           {isSignUp ? 'Hai un account? Log in' : 'Registrati gratis'}

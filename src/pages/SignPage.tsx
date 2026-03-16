@@ -37,8 +37,29 @@ export default function SignPage() {
   const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({})
   const [numPages, setNumPages] = useState(0)
   const [pdfReady, setPdfReady] = useState(false)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
 
   const hasFields = fields.length > 0
+
+  // Fetch PDF as blob to avoid CORS issues with Supabase signed URLs
+  useEffect(() => {
+    if (!pdfUrl || !hasFields) return
+    let cancelled = false
+    async function loadPdf() {
+      try {
+        const res = await fetch(pdfUrl)
+        if (!res.ok) throw new Error(`PDF fetch failed: ${res.status}`)
+        const blob = await res.blob()
+        if (!cancelled) setPdfBlobUrl(URL.createObjectURL(blob))
+      } catch (err: any) {
+        console.error('[SignPage] PDF blob load error:', err)
+        // Fallback: use URL directly
+        if (!cancelled) setPdfBlobUrl(pdfUrl)
+      }
+    }
+    loadPdf()
+    return () => { cancelled = true }
+  }, [pdfUrl, hasFields])
 
   useEffect(() => {
     if (token) loadData()
@@ -342,7 +363,7 @@ export default function SignPage() {
           hasFields ? (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
               <Document
-                file={pdfUrl}
+                file={pdfBlobUrl || pdfUrl}
                 onLoadSuccess={({ numPages: n }) => { setNumPages(n); setPdfReady(true) }}
                 loading={
                   <div className="flex items-center justify-center py-20">

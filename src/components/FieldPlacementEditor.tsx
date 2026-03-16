@@ -71,7 +71,31 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   const [pdfLoading, setPdfLoading] = useState(true)
   const [showMobilePalette, setShowMobilePalette] = useState(false)
   const [tapPlaceType, setTapPlaceType] = useState<FieldType | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+
+  // Fetch PDF as blob to avoid CORS issues with Supabase storage
+  useEffect(() => {
+    if (!pdfUrl) return
+    let cancelled = false
+    async function loadPdf() {
+      try {
+        const res = await fetch(pdfUrl)
+        if (!res.ok) throw new Error(`PDF fetch failed: ${res.status}`)
+        const blob = await res.blob()
+        if (!cancelled) {
+          const url = URL.createObjectURL(blob)
+          setPdfBlobUrl(url)
+        }
+      } catch (err: any) {
+        console.error('[FieldPlacementEditor] PDF load error:', err)
+        if (!cancelled) setPdfError(err.message)
+      }
+    }
+    loadPdf()
+    return () => { cancelled = true }
+  }, [pdfUrl])
 
   // Drag state for repositioning existing fields
   const dragRef = useRef<{
@@ -349,14 +373,20 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
           className="flex-1 overflow-y-auto px-4 py-6"
           onClick={() => setSelectedFieldId(null)}
         >
-          {pdfLoading && (
+          {(pdfLoading || !pdfBlobUrl) && !pdfError && (
             <div className="flex items-center justify-center py-20">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600" />
             </div>
           )}
 
+          {pdfError && (
+            <div className="flex items-center justify-center py-20 text-red-500 text-sm">
+              Errore nel caricamento del PDF: {pdfError}
+            </div>
+          )}
+
           <Document
-            file={pdfUrl}
+            file={pdfBlobUrl}
             onLoadSuccess={onDocumentLoadSuccess}
             loading=""
             className="flex flex-col items-center gap-6"

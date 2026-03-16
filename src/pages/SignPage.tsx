@@ -90,7 +90,6 @@ export default function SignPage() {
   }
 
   async function handleSign() {
-    if (!acceptedTerms) { setError('Devi accettare i termini'); return }
     setError('')
     try {
       const res = await fetch('/.netlify/functions/trustera-sign-complete', {
@@ -259,56 +258,31 @@ export default function SignPage() {
               Identita verificata con successo
             </div>
 
-            {/* Terms */}
-            <label className="flex items-start gap-3 mb-6 cursor-pointer">
+            {/* Marketing consent */}
+            <label className="flex items-start gap-3 mb-4 cursor-pointer">
               <input
                 type="checkbox"
-                checked={acceptedTerms}
-                onChange={e => setAcceptedTerms(e.target.checked)}
-                className="mt-1 h-5 w-5 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                checked={marketingConsent === true}
+                onChange={e => { setMarketingConsent(e.target.checked); setAcceptedTerms(true) }}
+                className="mt-0.5 h-[18px] w-[18px] rounded-md border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
               />
-              <span className="text-sm text-gray-700">
-                Confermo che i dati sono corretti e accetto di firmare elettronicamente questo documento.
+              <span className="text-[13px] text-gray-600 leading-snug">
+                Desidero ricevere aggiornamenti via email, inclusi suggerimenti, consigli e le ultime novità di Trustera.
               </span>
             </label>
 
-            {/* Marketing consent */}
-            <div className="border border-gray-200 rounded-xl p-4 mb-6 bg-gray-50/50">
-              <p className="text-sm font-medium text-gray-700 mb-2">Consenso Marketing</p>
-              <p className="text-xs text-gray-500 mb-3">
-                Acconsento al trattamento dei miei dati personali per finalita di marketing e comunicazioni promozionali
-                da parte di Trustera e dei suoi partner.
-              </p>
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="marketing"
-                    value="yes"
-                    checked={marketingConsent === true}
-                    onChange={() => setMarketingConsent(true)}
-                    className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
-                  />
-                  <span className="text-sm text-gray-700">Si</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="marketing"
-                    value="no"
-                    checked={marketingConsent === false}
-                    onChange={() => setMarketingConsent(false)}
-                    className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
-                  />
-                  <span className="text-sm text-gray-700">No</span>
-                </label>
-              </div>
-            </div>
+            {/* Terms acceptance text */}
+            <p className="text-[13px] text-gray-500 leading-snug mb-6">
+              Continuando, accetti i{' '}
+              <a href="/terms" target="_blank" rel="noreferrer" className="text-green-600 underline hover:text-green-700">Termini e Condizioni</a>
+              {' '}e l&apos;
+              <a href="/privacy" target="_blank" rel="noreferrer" className="text-green-600 underline hover:text-green-700">Informativa sulla privacy</a>
+              {' '}di Trustera.
+            </p>
 
             <button
-              onClick={handleSign}
-              disabled={!acceptedTerms}
-              className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-4 rounded-lg transition-colors text-lg"
+              onClick={() => { setAcceptedTerms(true); handleSign() }}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-colors text-lg"
             >
               Firma il Documento
             </button>

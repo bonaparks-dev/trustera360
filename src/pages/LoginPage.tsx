@@ -178,19 +178,28 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Marketing consent — signup only */}
+          {/* Marketing consent + terms — signup only */}
           {isSignUp && (
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={marketingConsent}
-                onChange={e => setMarketingConsent(e.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
-              />
-              <span className="text-xs text-gray-500">
-                Acconsento al trattamento dei miei dati personali per finalita di marketing e comunicazioni promozionali.
-              </span>
-            </label>
+            <div className="space-y-4">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={marketingConsent}
+                  onChange={e => setMarketingConsent(e.target.checked)}
+                  className="mt-0.5 h-[18px] w-[18px] rounded-md border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
+                />
+                <span className="text-[13px] text-gray-600 leading-snug">
+                  Desidero ricevere aggiornamenti via email, inclusi suggerimenti, consigli e le ultime novità di Trustera.
+                </span>
+              </label>
+              <p className="text-[13px] text-gray-500 leading-snug">
+                Continuando, accetti i{' '}
+                <a href="/terms" className="text-green-600 underline hover:text-green-700">Termini e Condizioni</a>
+                {' '}e l&apos;
+                <a href="/privacy" className="text-green-600 underline hover:text-green-700">Informativa sulla privacy</a>
+                {' '}di Trustera.
+              </p>
+            </div>
           )}
 
           {/* Submit */}

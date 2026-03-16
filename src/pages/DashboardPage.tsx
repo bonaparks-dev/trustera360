@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabaseClient'
 import toast from 'react-hot-toast'
 import type { Session } from '@supabase/supabase-js'
+import type { DocumentField } from '../types/fields'
+
+const FieldPlacementEditor = lazy(() => import('../components/FieldPlacementEditor'))
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -134,6 +137,12 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', channel: 'email' }])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Field editor
+  const [showFieldEditor, setShowFieldEditor] = useState(false)
+  const [editorPdfUrl, setEditorPdfUrl] = useState('')
+  const [editorDocumentId, setEditorDocumentId] = useState('')
+  const [editorSigners, setEditorSigners] = useState<SignerRow[]>([])
 
   // Contacts
   const [contacts, setContacts] = useState<Contact[]>([])
@@ -313,7 +322,7 @@ export default function DashboardPage({ session }: { session: Session }) {
       }).slice(0, 5)
     : []
 
-  async function handleUploadAndSend(e: React.FormEvent) {
+  async function handleUploadAndOpenEditor(e: React.FormEvent) {
     e.preventDefault()
     if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
 
@@ -322,6 +331,48 @@ export default function DashboardPage({ session }: { session: Session }) {
       toast.error('Aggiungi almeno un destinatario con nome e email')
       return
     }
+
+    setUploading(true)
+    try {
+      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('trustera')
+        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+
+      const { data: doc, error: insertError } = await supabase
+        .from('trustera_documents')
+        .insert({
+          owner_id: session.user.id,
+          name: selectedFile.name,
+          pdf_url: publicUrl,
+          status: 'draft',
+        })
+        .select()
+        .single()
+      if (insertError) throw insertError
+
+      // Generate a signed URL for the PDF so react-pdf can load it
+      const signedUrl = await getSignedUrl(publicUrl)
+
+      // Open field placement editor
+      setEditorPdfUrl(signedUrl || publicUrl)
+      setEditorDocumentId(doc.id)
+      setEditorSigners(validSigners)
+      setShowUploadModal(false)
+      setShowFieldEditor(true)
+    } catch (error: any) {
+      toast.error(error.message || 'Errore nel caricamento')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleSendWithoutFields() {
+    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    if (!selectedFile || validSigners.length === 0) return
 
     setUploading(true)
     try {
@@ -372,6 +423,54 @@ export default function DashboardPage({ session }: { session: Session }) {
       toast.error(error.message || 'Errore nel caricamento')
     } finally {
       setUploading(false)
+    }
+  }
+
+  async function handleFieldEditorComplete(fields: Omit<DocumentField, 'id' | 'document_id' | 'signer_id'>[]) {
+    try {
+      // Save fields
+      if (fields.length > 0) {
+        const res = await fetch('/.netlify/functions/trustera-save-fields', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId: editorDocumentId,
+            fields,
+            accessToken: session.access_token,
+          })
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || 'Errore salvataggio campi')
+        }
+      }
+
+      // Send signing requests
+      const res = await fetch('/.netlify/functions/trustera-send-signing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: editorDocumentId,
+          signers: editorSigners.map(s => ({
+            name: s.name.trim(),
+            email: s.email.trim(),
+            phone: s.phone.trim() || null,
+            channel: s.channel,
+          }))
+        })
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Errore invio')
+      }
+
+      toast.success(`Richiesta di firma inviata a ${editorSigners.length} destinatario${editorSigners.length > 1 ? 'i' : ''}`)
+      setShowFieldEditor(false)
+      resetUploadModal()
+      loadDocuments()
+    } catch (error: any) {
+      toast.error(error.message || 'Errore nell\'invio')
     }
   }
 
@@ -770,7 +869,7 @@ export default function DashboardPage({ session }: { session: Session }) {
               </button>
             </div>
 
-            <form onSubmit={handleUploadAndSend} className="px-5 pb-5">
+            <form onSubmit={handleUploadAndOpenEditor} className="px-5 pb-5">
 
               {/* File upload */}
               <div className="py-4 border-b border-gray-100">
@@ -933,22 +1032,48 @@ export default function DashboardPage({ session }: { session: Session }) {
                 )}
               </div>
 
-              {/* Submit */}
-              <button
-                type="submit"
-                disabled={uploading || signerRows.length === 0 || !selectedFile}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px] mt-2"
-              >
-                {uploading ? (
-                  <span className="inline-flex items-center gap-2">
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                    Invio in corso...
-                  </span>
-                ) : `Invia per Firma${signerRows.length > 0 ? ` (${signerRows.length})` : ''}`}
-              </button>
+              {/* Submit buttons */}
+              <div className="space-y-2 mt-2">
+                <button
+                  type="submit"
+                  disabled={uploading || signerRows.length === 0 || !selectedFile}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
+                >
+                  {uploading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                      Caricamento...
+                    </span>
+                  ) : `Posiziona Campi e Invia${signerRows.length > 0 ? ` (${signerRows.length})` : ''}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendWithoutFields}
+                  disabled={uploading || signerRows.length === 0 || !selectedFile}
+                  className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
+                >
+                  Invia senza campi
+                </button>
+              </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* ── Field Placement Editor ─────────────────────────────────────────── */}
+      {showFieldEditor && (
+        <Suspense fallback={
+          <div className="fixed inset-0 bg-gray-100 z-50 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600" />
+          </div>
+        }>
+          <FieldPlacementEditor
+            pdfUrl={editorPdfUrl}
+            signers={editorSigners.map(s => ({ name: s.name, email: s.email }))}
+            onComplete={handleFieldEditorComplete}
+            onCancel={() => setShowFieldEditor(false)}
+          />
+        </Suspense>
       )}
     </div>
   )

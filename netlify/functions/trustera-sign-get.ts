@@ -69,12 +69,22 @@ export const handler: Handler = async (event) => {
         signed_at: s.signed_at || null
       }))
 
+      // Fetch fields assigned to this signer
+      const { data: fieldRows } = await supabase
+        .from('trustera_document_fields')
+        .select('*')
+        .eq('document_id', doc.id)
+        .eq('signer_id', signerRow.id)
+        .order('page_number', { ascending: true })
+        .order('sort_order', { ascending: true })
+
       const response: Record<string, any> = {
         signerName: signerRow.signer_name,
         documentName: doc.name,
         pdfUrl,
         status: signerRow.status,
-        allSigners
+        allSigners,
+        fields: fieldRows || []
       }
 
       if (signerRow.status === 'signed') {

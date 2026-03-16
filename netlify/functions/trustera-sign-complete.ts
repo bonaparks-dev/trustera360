@@ -53,15 +53,57 @@ interface AttestationSigner {
   signing_user_agent: string
 }
 
+interface FieldValueEntry {
+  field_type: string
+  page_number: number
+  x_percent: number
+  y_percent: number
+  width_percent: number
+  height_percent: number
+  label?: string
+  value: string | boolean
+}
+
 async function buildSignedPdf(
   originalPdfBytes: ArrayBuffer,
   signers: AttestationSigner[],
   documentName: string,
-  originalHash: string
+  originalHash: string,
+  fieldEntries?: FieldValueEntry[]
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes)
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+  // Embed field values on existing pages
+  if (fieldEntries && fieldEntries.length > 0) {
+    const existingPages = pdfDoc.getPages()
+    for (const entry of fieldEntries) {
+      const pageIndex = entry.page_number - 1
+      if (pageIndex < 0 || pageIndex >= existingPages.length) continue
+
+      const page = existingPages[pageIndex]
+      const { width, height } = page.getSize()
+
+      // Convert percentages to pdf-lib coordinates (bottom-left origin)
+      const x = (entry.x_percent / 100) * width
+      const y = height - (entry.y_percent / 100) * height - (entry.height_percent / 100) * height
+
+      if (entry.field_type === 'checkbox') {
+        if (entry.value === true) {
+          // Draw a checkmark
+          page.drawText('✓', { x: x + 2, y: y + 2, size: 12, font: boldFont, color: rgb(0.09, 0.64, 0.27) })
+        }
+      } else if (entry.field_type === 'signature') {
+        // Draw signer name in bold as "signature"
+        const textValue = typeof entry.value === 'string' && entry.value ? entry.value : signers[0]?.name || ''
+        page.drawText(textValue, { x: x + 4, y: y + 6, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+        page.drawText('Certificato da Trustera', { x: x + 4, y: y - 4, size: 6, font, color: rgb(0.09, 0.64, 0.27) })
+      } else if (typeof entry.value === 'string' && entry.value) {
+        page.drawText(entry.value, { x: x + 2, y: y + 4, size: 9, font, color: rgb(0.15, 0.15, 0.15) })
+      }
+    }
+  }
 
   // Add footer with signer names + "Certificato da Trustera" on ALL existing pages
   const existingPages = pdfDoc.getPages()
@@ -202,7 +244,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { token, marketingConsent } = JSON.parse(event.body || '{}')
+    const { token, marketingConsent, fieldValues } = JSON.parse(event.body || '{}')
     if (!token) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Token richiesto' }) }
     }
@@ -281,6 +323,17 @@ export const handler: Handler = async (event) => {
       // Save marketing consent to leads + marketing_consents tables
       await saveMarketingConsent(signerRow.signer_email, signerRow.signer_name, marketingConsent ?? false, 'signing_complete')
 
+      // Save field values for this signer
+      if (fieldValues && typeof fieldValues === 'object') {
+        for (const [fieldId, value] of Object.entries(fieldValues)) {
+          await supabase
+            .from('trustera_document_fields')
+            .update({ value: String(value), filled_at: new Date().toISOString() })
+            .eq('id', fieldId)
+            .eq('signer_id', signerRow.id)
+        }
+      }
+
       // Check if ALL signers for this document have now signed
       const { data: allSigners, error: allSignersError } = await supabase
         .from('trustera_document_signers')
@@ -323,8 +376,46 @@ export const handler: Handler = async (event) => {
         signing_user_agent: s.signing_user_agent || 'unknown'
       }))
 
-      // Build signed PDF with one attestation page per signer
-      const signedPdfBytes = await buildSignedPdf(pdfBytes, attestationSigners, doc.name, originalHash)
+      // Fetch all field definitions + values for this document
+      let fieldEntries: FieldValueEntry[] = []
+      const { data: docFields } = await supabase
+        .from('trustera_document_fields')
+        .select('*')
+        .eq('document_id', doc.id)
+
+      if (docFields && docFields.length > 0) {
+        // Save current signer's field values to DB
+        if (fieldValues && typeof fieldValues === 'object') {
+          for (const [fieldId, value] of Object.entries(fieldValues)) {
+            await supabase
+              .from('trustera_document_fields')
+              .update({ value: String(value), filled_at: new Date().toISOString() })
+              .eq('id', fieldId)
+          }
+        }
+
+        // Re-fetch with updated values
+        const { data: updatedFields } = await supabase
+          .from('trustera_document_fields')
+          .select('*')
+          .eq('document_id', doc.id)
+
+        fieldEntries = (updatedFields || [])
+          .filter((f: any) => f.value !== null && f.value !== undefined)
+          .map((f: any) => ({
+            field_type: f.field_type,
+            page_number: f.page_number,
+            x_percent: f.x_percent,
+            y_percent: f.y_percent,
+            width_percent: f.width_percent,
+            height_percent: f.height_percent,
+            label: f.label,
+            value: f.field_type === 'checkbox' ? f.value === 'true' : f.value,
+          }))
+      }
+
+      // Build signed PDF with field values + one attestation page per signer
+      const signedPdfBytes = await buildSignedPdf(pdfBytes, attestationSigners, doc.name, originalHash, fieldEntries)
 
       // Upload signed PDF to storage
       const fileName = `signed/${doc.id}_signed_${Date.now()}.pdf`

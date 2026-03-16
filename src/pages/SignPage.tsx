@@ -1,7 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
+import 'react-pdf/dist/esm/Page/TextLayer.css'
+import type { DocumentField, FieldType } from '../types/fields'
+
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
 type SigningStatus = 'loading' | 'viewing' | 'otp_sending' | 'otp_sent' | 'otp_verifying' | 'signing' | 'signed' | 'expired' | 'error'
+
+const FIELD_LABELS: Record<FieldType, string> = {
+  signature: 'Firma',
+  date: 'Data della firma',
+  name: 'Nome del firmatario',
+  email: 'Email del firmatario',
+  text: 'Testo',
+  label: 'Dicitura',
+  checkbox: '',
+  radio: '',
+}
 
 export default function SignPage() {
   const { token } = useParams<{ token: string }>()
@@ -17,6 +34,14 @@ export default function SignPage() {
   const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null)
   const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Fields
+  const [fields, setFields] = useState<DocumentField[]>([])
+  const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({})
+  const [numPages, setNumPages] = useState(0)
+  const [pdfReady, setPdfReady] = useState(false)
+
+  const hasFields = fields.length > 0
 
   useEffect(() => {
     if (token) loadData()
@@ -35,6 +60,41 @@ export default function SignPage() {
       setSignerName(data.signerName)
       setDocumentName(data.documentName)
       setPdfUrl(data.pdfUrl)
+
+      // Set fields and auto-fill values
+      if (data.fields && data.fields.length > 0) {
+        setFields(data.fields)
+        const initialValues: Record<string, string | boolean> = {}
+        for (const f of data.fields) {
+          switch (f.field_type) {
+            case 'name':
+              initialValues[f.id] = data.signerName || ''
+              break
+            case 'email':
+              initialValues[f.id] = data.signerEmail || ''
+              break
+            case 'date':
+              initialValues[f.id] = new Date().toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })
+              break
+            case 'signature':
+              initialValues[f.id] = '' // will be filled on sign
+              break
+            case 'checkbox':
+              initialValues[f.id] = false
+              break
+            case 'text':
+              initialValues[f.id] = f.default_value || ''
+              break
+            case 'label':
+              initialValues[f.id] = f.default_value || f.label || ''
+              break
+            default:
+              initialValues[f.id] = ''
+          }
+        }
+        setFieldValues(initialValues)
+      }
+
       if (data.status === 'signed') {
         setSignedPdfUrl(data.signedPdfUrl)
         setSignedAt(data.signedAt)
@@ -49,6 +109,21 @@ export default function SignPage() {
   }
 
   async function handleRequestOtp() {
+    // Validate required fields are filled
+    if (hasFields) {
+      for (const f of fields) {
+        if (!f.required) continue
+        const val = fieldValues[f.id]
+        if (f.field_type === 'checkbox') continue // checkbox can be unchecked
+        if (f.field_type === 'label') continue // labels are read-only
+        if (f.field_type === 'signature') continue // filled at sign time
+        if (!val || (typeof val === 'string' && !val.trim())) {
+          setError(`Compila il campo "${f.label || FIELD_LABELS[f.field_type]}" prima di procedere`)
+          return
+        }
+      }
+    }
+
     setStatus('otp_sending')
     setError('')
     try {
@@ -95,7 +170,11 @@ export default function SignPage() {
       const res = await fetch('/.netlify/functions/trustera-sign-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, marketingConsent })
+        body: JSON.stringify({
+          token,
+          marketingConsent,
+          fieldValues: hasFields ? fieldValues : undefined,
+        })
       })
       if (!res.ok) { const err = await res.json(); setError(err.error); return }
       const data = await res.json()
@@ -127,6 +206,94 @@ export default function SignPage() {
     setOtp(newOtp)
     otpRefs.current[Math.min(pasted.length, 5)]?.focus()
   }
+
+  function updateFieldValue(fieldId: string, value: string | boolean) {
+    setFieldValues(prev => ({ ...prev, [fieldId]: value }))
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  function renderFieldInput(field: DocumentField) {
+    const val = fieldValues[field.id]
+
+    switch (field.field_type) {
+      case 'signature':
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-600 text-xs font-medium cursor-default">
+            {signerName || 'Firma'}
+          </div>
+        )
+      case 'date':
+        return (
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+            {val as string}
+          </div>
+        )
+      case 'name':
+        return (
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+            {val as string}
+          </div>
+        )
+      case 'email':
+        return (
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+            {val as string}
+          </div>
+        )
+      case 'text':
+        return (
+          <input
+            type="text"
+            value={(val as string) || ''}
+            onChange={e => updateFieldValue(field.id, e.target.value)}
+            placeholder={field.placeholder || field.label || 'Inserisci testo'}
+            className="w-full h-full px-1 text-xs border border-gray-300 rounded bg-white focus:border-green-500 focus:outline-none"
+          />
+        )
+      case 'checkbox':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <input
+              type="checkbox"
+              checked={!!val}
+              onChange={e => updateFieldValue(field.id, e.target.checked)}
+              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+            />
+          </div>
+        )
+      case 'radio':
+        return (
+          <div className="w-full h-full flex items-center justify-center">
+            <input
+              type="radio"
+              name={field.radio_group || field.id}
+              checked={!!val}
+              onChange={() => {
+                // Uncheck all radios in same group, check this one
+                if (field.radio_group) {
+                  const groupFields = fields.filter(f => f.radio_group === field.radio_group)
+                  const updates: Record<string, boolean> = {}
+                  groupFields.forEach(f => { updates[f.id] = f.id === field.id })
+                  setFieldValues(prev => ({ ...prev, ...updates }))
+                } else {
+                  updateFieldValue(field.id, true)
+                }
+              }}
+              className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
+            />
+          </div>
+        )
+      case 'label':
+        return (
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-600 truncate">
+            {field.label || field.default_value || ''}
+          </div>
+        )
+    }
+  }
+
+  // ── Loading / Error / Expired states ────────────────────────────────────────
 
   if (status === 'loading') {
     return (
@@ -173,16 +340,61 @@ export default function SignPage() {
           <p className="text-sm text-gray-500">Firmatario: {signerName}</p>
         </div>
 
-        {/* PDF viewer */}
+        {/* PDF viewer — react-pdf with field overlays when fields exist, otherwise Google Docs iframe */}
         {pdfUrl && status !== 'signed' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <iframe
-              src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
-              className="w-full border-0"
-              style={{ height: '70vh', minHeight: '500px' }}
-              title="Documento"
-            />
-          </div>
+          hasFields ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+              <Document
+                file={pdfUrl}
+                onLoadSuccess={({ numPages: n }) => { setNumPages(n); setPdfReady(true) }}
+                loading={
+                  <div className="flex items-center justify-center py-20">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+                  </div>
+                }
+                className="flex flex-col items-center"
+              >
+                {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
+                  <div key={pageNum} className="relative w-full">
+                    <Page
+                      pageNumber={pageNum}
+                      width={Math.min(650, window.innerWidth - 48)}
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                    />
+
+                    {/* Field overlays for this page */}
+                    {pdfReady && fields
+                      .filter(f => f.page_number === pageNum)
+                      .map(field => (
+                        <div
+                          key={field.id}
+                          className="absolute"
+                          style={{
+                            left: `${field.x_percent}%`,
+                            top: `${field.y_percent}%`,
+                            width: `${field.width_percent}%`,
+                            height: `${field.height_percent}%`,
+                          }}
+                        >
+                          {renderFieldInput(field)}
+                        </div>
+                      ))
+                    }
+                  </div>
+                ))}
+              </Document>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+              <iframe
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
+                className="w-full border-0"
+                style={{ height: '70vh', minHeight: '500px' }}
+                title="Documento"
+              />
+            </div>
+          )
         )}
 
         {error && (
@@ -195,7 +407,11 @@ export default function SignPage() {
         {status === 'viewing' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
             <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Documento</h2>
-            <p className="text-gray-600 text-sm mb-6">Invieremo un codice di verifica via WhatsApp o email.</p>
+            <p className="text-gray-600 text-sm mb-6">
+              {hasFields
+                ? 'Compila i campi sopra, poi clicca per ricevere il codice di verifica.'
+                : 'Invieremo un codice di verifica via WhatsApp o email.'}
+            </p>
             <button
               onClick={handleRequestOtp}
               className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"

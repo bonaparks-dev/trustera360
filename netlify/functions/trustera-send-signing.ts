@@ -163,12 +163,13 @@ export const handler: Handler = async (event) => {
     const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() // 12 hours
 
     // Process each signer
-    for (const signer of signers) {
+    for (let signerIndex = 0; signerIndex < signers.length; signerIndex++) {
+      const signer = signers[signerIndex]
       const token = crypto.randomBytes(32).toString('hex')
       const signingUrl = `${SITE_URL}/sign/${token}`
 
       // Insert signer record into trustera_document_signers
-      const { error: signerInsertError } = await supabase
+      const { data: insertedSigner, error: signerInsertError } = await supabase
         .from('trustera_document_signers')
         .insert({
           document_id: documentId,
@@ -180,10 +181,25 @@ export const handler: Handler = async (event) => {
           status: 'pending',
           created_at: new Date().toISOString()
         })
+        .select('id')
+        .single()
 
       if (signerInsertError) {
         console.error('[trustera-send-signing] Failed to insert signer:', signerInsertError.message)
         throw signerInsertError
+      }
+
+      // Link document fields (placed via field editor) to this signer
+      if (insertedSigner) {
+        const { error: fieldLinkError } = await supabase
+          .from('trustera_document_fields')
+          .update({ signer_id: insertedSigner.id })
+          .eq('document_id', documentId)
+          .eq('signer_index', signerIndex)
+
+        if (fieldLinkError) {
+          console.warn('[trustera-send-signing] Field link error:', fieldLinkError.message)
+        }
       }
 
       // Upsert into trustera_contacts (by owner_id + email)

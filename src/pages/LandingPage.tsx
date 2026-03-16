@@ -29,8 +29,8 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
               { step: '1', title: 'Carica il documento', desc: 'Trascina un PDF nella dashboard. Supporta qualsiasi tipo di documento.' },
-              { step: '2', title: 'Scegli il firmatario', desc: 'Inserisci nome, email e WhatsApp. Puoi inviare a clienti, fornitori, dipendenti — chiunque.' },
-              { step: '3', title: 'Invia e monitora', desc: 'Il firmatario riceve il link via email e WhatsApp. Firma con OTP. Tu ricevi il documento firmato.' },
+              { step: '2', title: 'Aggiungi i firmatari', desc: 'Uno o piu firmatari per documento. Inserisci nome, email e WhatsApp. Clienti, fornitori, dipendenti — chiunque.' },
+              { step: '3', title: 'Invia e monitora', desc: 'Ogni firmatario riceve il proprio link via email e WhatsApp. Firma con OTP. Monitora chi ha gia firmato.' },
             ].map(s => (
               <div key={s.step} className="text-center">
                 <div className="w-12 h-12 rounded-full bg-green-600 text-white text-xl font-bold flex items-center justify-center mx-auto mb-4">{s.step}</div>
@@ -39,7 +39,7 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-          <p className="text-center text-sm text-gray-400 mt-8">Ripeti per ogni persona. Ogni documento ha il suo audit trail indipendente.</p>
+          <p className="text-center text-sm text-gray-400 mt-8">Ogni firmatario ha il proprio link e audit trail indipendente.</p>
         </div>
       </section>
 
@@ -48,7 +48,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { title: 'Invia a chiunque.', desc: 'Clienti, fornitori, dipendenti. Basta un\'email per far firmare.' },
+              { title: 'Multi-firmatario.', desc: 'Invia a piu persone. Ogni firmatario riceve il proprio link e firma in autonomia.' },
               { title: 'Tracciata.', desc: 'Audit trail completo: IP, data, ora, dispositivo per ogni firma.' },
               { title: 'Protetta.', desc: 'Hash SHA-256, documento non modificabile dopo la firma.' },
               { title: 'Gratuita.', desc: 'Piano Free senza limiti, sostenuto da offerte partner.' },

@@ -13,12 +13,34 @@ export default function LandingPage() {
           Con <strong className="text-green-600">Trustera</strong> firmi e invii tutto <strong className="text-gray-900">in meno di un minuto.</strong>
         </p>
         <p className="text-base sm:text-lg text-gray-500 mb-10 leading-relaxed max-w-2xl mx-auto">
-          Ogni documento ha <strong className="text-gray-700">Audit Trail certificato</strong>: data, ora, dispositivo e firma registrati.
-          <br />Cosi nessuno puo modificare il documento dopo la firma.
+          Carica un PDF, scegli a chi inviarlo e il firmatario riceve il link via <strong className="text-gray-700">email e WhatsApp</strong>.
+          <br />Ogni documento ha <strong className="text-gray-700">Audit Trail certificato</strong> con data, ora e dispositivo.
         </p>
         <Link to="/login" className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-4 px-10 rounded-xl text-lg transition-all shadow-lg shadow-green-600/25 active:scale-[0.98]">
           Inizia Gratis
         </Link>
+      </section>
+
+      {/* How it works */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center text-[#0d3d2a] mb-4">Come funziona</h2>
+          <p className="text-center text-gray-400 mb-12 max-w-xl mx-auto">Tre passaggi. Un minuto. Invia a chiunque.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              { step: '1', title: 'Carica il documento', desc: 'Trascina un PDF nella dashboard. Supporta qualsiasi tipo di documento.' },
+              { step: '2', title: 'Scegli il firmatario', desc: 'Inserisci nome, email e WhatsApp. Puoi inviare a clienti, fornitori, dipendenti — chiunque.' },
+              { step: '3', title: 'Invia e monitora', desc: 'Il firmatario riceve il link via email e WhatsApp. Firma con OTP. Tu ricevi il documento firmato.' },
+            ].map(s => (
+              <div key={s.step} className="text-center">
+                <div className="w-12 h-12 rounded-full bg-green-600 text-white text-xl font-bold flex items-center justify-center mx-auto mb-4">{s.step}</div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{s.title}</h3>
+                <p className="text-gray-500 text-sm leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-center text-sm text-gray-400 mt-8">Ripeti per ogni persona. Ogni documento ha il suo audit trail indipendente.</p>
+        </div>
       </section>
 
       {/* Features */}
@@ -26,8 +48,8 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
-              { title: 'Firma digitale.', desc: 'Firma qualsiasi documento PDF con verifica OTP.' },
-              { title: 'Tracciata.', desc: 'Audit trail completo: IP, data, ora, dispositivo.' },
+              { title: 'Invia a chiunque.', desc: 'Clienti, fornitori, dipendenti. Basta un\'email per far firmare.' },
+              { title: 'Tracciata.', desc: 'Audit trail completo: IP, data, ora, dispositivo per ogni firma.' },
               { title: 'Protetta.', desc: 'Hash SHA-256, documento non modificabile dopo la firma.' },
               { title: 'Gratuita.', desc: 'Piano Free senza limiti, sostenuto da offerte partner.' },
             ].map(f => (

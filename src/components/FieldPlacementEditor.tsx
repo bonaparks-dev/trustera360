@@ -2,7 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css'
 import 'react-pdf/dist/esm/Page/TextLayer.css'
-import { FieldType, FIELD_TYPES, SIGNER_COLORS, type DocumentField } from '../types/fields'
+import { FIELD_TYPES, SIGNER_COLORS } from '../types/fields'
+import type { FieldType, DocumentField } from '../types/fields'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
 
@@ -69,7 +70,6 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   const [fields, setFields] = useState<PlacedField[]>([])
   const [activeSignerIndex, setActiveSignerIndex] = useState(0)
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
-  const [draggingType, setDraggingType] = useState<FieldType | null>(null)
   const [pdfLoading, setPdfLoading] = useState(true)
   const [showMobilePalette, setShowMobilePalette] = useState(false)
   const [tapPlaceType, setTapPlaceType] = useState<FieldType | null>(null)
@@ -114,7 +114,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   // ── Drag from palette (desktop) ────────────────────────────────────────────
 
   function handlePaletteDragStart(e: React.DragEvent, fieldType: FieldType) {
-    setDraggingType(fieldType)
+
     e.dataTransfer.setData('fieldType', fieldType)
     e.dataTransfer.effectAllowed = 'copy'
   }
@@ -137,7 +137,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
     const yPercent = ((e.clientY - rect.top) / rect.height) * 100
 
     addFieldAtPosition(fieldType, pageNumber, xPercent, yPercent)
-    setDraggingType(null)
+
   }
 
   // ── Tap to place (mobile) ──────────────────────────────────────────────────

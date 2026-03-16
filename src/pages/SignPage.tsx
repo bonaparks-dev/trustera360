@@ -30,7 +30,6 @@ export default function SignPage() {
   const [signedAt, setSignedAt] = useState<string | null>(null)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
-  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null)
   const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -479,7 +478,7 @@ export default function SignPage() {
               <input
                 type="checkbox"
                 checked={marketingConsent === true}
-                onChange={e => { setMarketingConsent(e.target.checked); setAcceptedTerms(true) }}
+                onChange={e => setMarketingConsent(e.target.checked)}
                 className="mt-0.5 h-[18px] w-[18px] rounded-md border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
               />
               <span className="text-[13px] text-gray-600 leading-snug">
@@ -497,7 +496,7 @@ export default function SignPage() {
             </p>
 
             <button
-              onClick={() => { setAcceptedTerms(true); handleSign() }}
+              onClick={() => { handleSign() }}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-colors text-lg"
             >
               Firma il Documento

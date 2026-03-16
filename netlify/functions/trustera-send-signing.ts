@@ -176,6 +176,7 @@ export const handler: Handler = async (event) => {
           signer_name: signer.name,
           signer_email: signer.email,
           signer_phone: signer.phone || null,
+          notification_channel: signer.channel || 'email',
           signing_token: token,
           signing_token_expires_at: expiresAt,
           status: 'pending',

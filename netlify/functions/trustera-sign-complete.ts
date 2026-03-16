@@ -22,7 +22,7 @@ async function sendSignedPdfEmail(
   to: string,
   documentName: string,
   signerNames: string,
-  pdfUrl: string,
+  pdfBytes: Buffer,
   isOwner: boolean
 ): Promise<void> {
   try {
@@ -31,8 +31,8 @@ async function sendSignedPdfEmail(
       : `Hai firmato: ${documentName}`
 
     const bodyText = isOwner
-      ? `Il documento "${documentName}" è stato firmato da tutti i firmatari (${signerNames}).\n\nScarica il documento firmato:\n${pdfUrl}\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
-      : `Hai firmato il documento "${documentName}".\n\nScarica il documento firmato:\n${pdfUrl}\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
+      ? `Il documento "${documentName}" è stato firmato da tutti i firmatari (${signerNames}).\n\nIl PDF firmato è in allegato.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
+      : `Hai firmato il documento "${documentName}".\n\nIl PDF firmato è in allegato.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
 
     const bodyHtml = `<!DOCTYPE html>
 <html lang="it"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
@@ -47,12 +47,12 @@ async function sendSignedPdfEmail(
     ${isOwner
       ? `<p style="margin:0 0 12px;">Il documento <strong>${documentName}</strong> è stato firmato da tutti i firmatari.</p><p style="margin:0 0 12px;">Firmatari: <strong>${signerNames}</strong></p>`
       : `<p style="margin:0 0 12px;">Hai firmato il documento <strong>${documentName}</strong>.</p>`}
-    <p style="margin:0;">Clicca il pulsante qui sotto per scaricare il documento firmato:</p>
+    <p style="margin:0;">Il PDF firmato è in allegato a questa email.</p>
   </td></tr>
   <tr><td style="padding:28px 40px;text-align:center;">
-    <a href="${pdfUrl}" style="display:inline-block;background-color:#16a34a;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16px;font-weight:700;text-decoration:none;padding:14px 32px;border-radius:8px;">
-      Scarica PDF Firmato
-    </a>
+    <div style="display:inline-block;background-color:#f0fdf4;color:#16a34a;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;border:1px solid #bbf7d0;">
+      📎 PDF allegato
+    </div>
   </td></tr>
   <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
   <tr><td style="padding:24px 40px 32px;text-align:center;">
@@ -65,6 +65,8 @@ async function sendSignedPdfEmail(
 </td></tr></table>
 </body></html>`
 
+    const safeName = documentName.replace(/[^a-zA-Z0-9._-]/g, '_')
+
     await resend.emails.send({
       from: 'Trustera <info@trustera360.app>',
       replyTo: 'info@trustera360.app',
@@ -72,6 +74,10 @@ async function sendSignedPdfEmail(
       subject,
       text: bodyText,
       html: bodyHtml,
+      attachments: [{
+        filename: `${safeName}_firmato.pdf`,
+        content: pdfBytes,
+      }],
     })
     console.log('[trustera-sign-complete] Signed PDF email sent to:', to)
   } catch (err: any) {
@@ -401,7 +407,7 @@ export const handler: Handler = async (event) => {
       // Check if ALL signers for this document have now signed
       const { data: allSigners, error: allSignersError } = await supabase
         .from('trustera_document_signers')
-        .select('id, signer_name, signer_email, signer_phone, status, signed_at, signing_ip, signing_user_agent')
+        .select('id, signer_name, signer_email, signer_phone, notification_channel, status, signed_at, signing_ip, signing_user_agent')
         .eq('document_id', doc.id)
 
       if (allSignersError) {
@@ -535,23 +541,24 @@ export const handler: Handler = async (event) => {
         console.warn('[trustera-sign-complete] signed_documents_log insert failed:', logErr.message)
       }
 
-      // Send signed PDF to sender (document owner) via email
+      const signedPdfBuffer = Buffer.from(signedPdfBytes)
+
+      // Send signed PDF to sender (document owner) via email with attachment
       if (doc.owner_id) {
         const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
         if (ownerUser?.email) {
           const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
-          await sendSignedPdfEmail(ownerUser.email, doc.name, signerNamesList, publicUrl, true)
+          await sendSignedPdfEmail(ownerUser.email, doc.name, signerNamesList, signedPdfBuffer, true)
         }
       }
 
-      // Send signed PDF to each signer via their chosen channel
+      // Send signed PDF to each signer via the channel chosen by the sender
       for (const s of allSigners) {
-        if (s.signer_phone) {
-          // Try WhatsApp first if they have a phone
+        const channel = (s as any).notification_channel || 'email'
+        if (channel === 'whatsapp' && s.signer_phone) {
           await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
         } else {
-          // Fallback: send via email
-          await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, publicUrl, false)
+          await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, signedPdfBuffer, false)
         }
       }
 
@@ -676,29 +683,22 @@ export const handler: Handler = async (event) => {
     // Save marketing consent
     await saveMarketingConsent(doc.signer_email, doc.signer_name, marketingConsent ?? false, 'signing_complete_legacy')
 
-    // Send signed PDF to sender (document owner) via email
+    const signedPdfBuffer = Buffer.from(signedPdfBytes)
+
+    // Send signed PDF to sender (document owner) via email with attachment
     if (doc.owner_id) {
       const { data: { user: ownerUser } } = await supabase.auth.admin.getUserById(doc.owner_id)
       if (ownerUser?.email) {
-        await sendSignedPdfEmail(ownerUser.email, doc.name, doc.signer_name, publicUrl, true)
+        await sendSignedPdfEmail(ownerUser.email, doc.name, doc.signer_name, signedPdfBuffer, true)
       }
     }
 
-    // Send signed PDF to signer via WhatsApp or email
-    let signerPhone = doc.signer_phone || ''
-    if (!signerPhone && doc.signer_email) {
-      const { data: customer } = await supabaseDR7
-        .from('customers_extended')
-        .select('telefono')
-        .eq('email', doc.signer_email)
-        .maybeSingle()
-      if (customer?.telefono) signerPhone = customer.telefono
-    }
-
-    if (signerPhone) {
-      await sendWhatsAppPdf(signerPhone, publicUrl, doc.name, doc.signer_name)
+    // Send signed PDF to signer via the channel chosen by the sender
+    const channel = doc.notification_channel || 'email'
+    if (channel === 'whatsapp' && doc.signer_phone) {
+      await sendWhatsAppPdf(doc.signer_phone, publicUrl, doc.name, doc.signer_name)
     } else {
-      await sendSignedPdfEmail(doc.signer_email, doc.name, doc.signer_name, publicUrl, false)
+      await sendSignedPdfEmail(doc.signer_email, doc.name, doc.signer_name, signedPdfBuffer, false)
     }
 
     console.log('[trustera-sign-complete] Legacy signing complete for doc:', doc.id)

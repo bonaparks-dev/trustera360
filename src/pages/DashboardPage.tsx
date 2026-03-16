@@ -42,16 +42,6 @@ interface Contact {
   created_at: string
 }
 
-interface Lead {
-  id: string
-  nome?: string
-  email?: string
-  telefono?: string
-  marketing_consent?: boolean
-  prima_volta?: string
-  ultima_volta?: string
-}
-
 interface SignerRow {
   name: string
   email: string
@@ -80,14 +70,6 @@ function IconContacts({ className }: { className?: string }) {
   )
 }
 
-function IconLeads({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-    </svg>
-  )
-}
-
 function IconChevron({ open }: { open: boolean }) {
   return (
     <svg className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -100,14 +82,6 @@ function IconTrash({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
       <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-    </svg>
-  )
-}
-
-function IconPlus({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
   )
 }
@@ -159,19 +133,12 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', channel: 'email' }])
-  const [contactSuggestions, setContactSuggestions] = useState<Contact[]>([])
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Contacts
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [contactSearch, setContactSearch] = useState('')
-
-  // Leads
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [leadsLoading, setLeadsLoading] = useState(false)
-  const [leadSearch, setLeadSearch] = useState('')
 
   const userName = session.user.user_metadata?.full_name || session.user.email || 'Utente'
   const userEmail = session.user.email || ''
@@ -184,7 +151,6 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   useEffect(() => {
     if (section === 'contatti') loadContacts()
-    if (section === 'lead') loadLeads()
   }, [section])
 
   async function getSignedUrl(url: string | null) {
@@ -287,70 +253,65 @@ export default function DashboardPage({ session }: { session: Session }) {
     setContactsLoading(false)
   }
 
-  async function loadLeads() {
-    setLeadsLoading(true)
-    try {
-      const res = await fetch('/.netlify/functions/trustera-get-leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: session.access_token })
-      })
-      if (res.ok) {
-        const { leads: data } = await res.json()
-        setLeads(data || [])
-      } else {
-        toast.error('Impossibile caricare i lead')
-      }
-    } catch (err) {
-      console.error('Error loading leads:', err)
-      toast.error('Errore nel caricamento dei lead')
-    }
-    setLeadsLoading(false)
-  }
-
   // ── Upload modal ──────────────────────────────────────────────────────────
+
+  // ── Modal state ──
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showNewForm, setShowNewForm] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newChannel, setNewChannel] = useState<'email' | 'whatsapp'>('email')
 
   function resetUploadModal() {
     setSelectedFile(null)
-    setSignerRows([{ name: '', email: '', phone: '', channel: 'email' }])
-    setContactSuggestions([])
-    setActiveSuggestionIndex(null)
+    setSignerRows([])
+    setSearchQuery('')
+    setShowNewForm(false)
+    setNewName('')
+    setNewEmail('')
+    setNewPhone('')
+    setNewChannel('email')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  function addSignerRow() {
-    setSignerRows(prev => [...prev, { name: '', email: '', phone: '', channel: 'email' }])
+  function addSignerFromForm() {
+    if (!newName.trim() || !newEmail.trim()) { toast.error('Nome e email richiesti'); return }
+    setSignerRows(prev => [...prev, { name: newName.trim(), email: newEmail.trim(), phone: newPhone.trim(), channel: newChannel }])
+    setNewName('')
+    setNewEmail('')
+    setNewPhone('')
+    setNewChannel('email')
+    setShowNewForm(false)
+    setSearchQuery('')
+  }
+
+  function addSignerFromContact(contact: Contact) {
+    // Don't add duplicate
+    if (signerRows.some(s => s.email.toLowerCase() === contact.email.toLowerCase())) {
+      toast.error('Contatto gia aggiunto')
+      return
+    }
+    setSignerRows(prev => [...prev, {
+      name: contact.name,
+      email: contact.email,
+      phone: contact.phone || '',
+      channel: contact.phone ? 'whatsapp' : 'email'
+    }])
+    setSearchQuery('')
   }
 
   function removeSignerRow(index: number) {
     setSignerRows(prev => prev.filter((_, i) => i !== index))
   }
 
-  function updateSignerRow(index: number, field: keyof SignerRow, value: string) {
-    setSignerRows(prev => prev.map((row, i) => i === index ? { ...row, [field]: value } : row))
-
-    if (field === 'email' && value.length >= 2) {
-      const query = value.toLowerCase()
-      const matches = contacts.filter(c =>
-        c.email.toLowerCase().includes(query) || c.name.toLowerCase().includes(query)
-      )
-      setContactSuggestions(matches.slice(0, 6))
-      setActiveSuggestionIndex(index)
-    } else if (field === 'email') {
-      setContactSuggestions([])
-      setActiveSuggestionIndex(null)
-    }
-  }
-
-  function applySuggestion(rowIndex: number, contact: Contact) {
-    setSignerRows(prev => prev.map((row, i) =>
-      i === rowIndex
-        ? { name: contact.name, email: contact.email, phone: contact.phone || '', channel: contact.phone ? 'whatsapp' as const : 'email' as const }
-        : row
-    ))
-    setContactSuggestions([])
-    setActiveSuggestionIndex(null)
-  }
+  const filteredContactsForSearch = searchQuery.length >= 1
+    ? contacts.filter(c => {
+        const q = searchQuery.toLowerCase()
+        const alreadyAdded = signerRows.some(s => s.email.toLowerCase() === c.email.toLowerCase())
+        return !alreadyAdded && (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+      }).slice(0, 5)
+    : []
 
   async function handleUploadAndSend(e: React.FormEvent) {
     e.preventDefault()
@@ -446,13 +407,6 @@ export default function DashboardPage({ session }: { session: Session }) {
   const filteredContacts = contacts.filter(c => {
     const q = contactSearch.toLowerCase()
     return !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-  })
-
-  const filteredLeads = leads.filter(l => {
-    const q = leadSearch.toLowerCase()
-    return !q ||
-      (l.nome || '').toLowerCase().includes(q) ||
-      (l.email || '').toLowerCase().includes(q)
   })
 
   // ── Sidebar nav items ─────────────────────────────────────────────────────
@@ -789,248 +743,210 @@ export default function DashboardPage({ session }: { session: Session }) {
             </div>
           )}
 
-          {/* ════════════════ LEAD ════════════════ */}
-          {section === 'lead' && (
-            <div>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-gray-800">Lead</h2>
-                <span className="text-sm text-gray-400">{leads.length} totali</span>
-              </div>
-
-              <div className="mb-4">
-                <input
-                  type="text"
-                  value={leadSearch}
-                  onChange={e => setLeadSearch(e.target.value)}
-                  placeholder="Cerca per nome o email..."
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                />
-              </div>
-
-              {leadsLoading ? (
-                <div className="text-center py-16">
-                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600 mx-auto" />
-                </div>
-              ) : filteredLeads.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-                  <p className="text-gray-400">
-                    {leadSearch ? 'Nessun lead trovato' : 'Nessun lead ancora'}
-                  </p>
-                </div>
-              ) : (
-                <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100">
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Nome</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">Telefono</th>
-                        <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">Marketing</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Prima volta</th>
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hidden lg:table-cell">Ultima volta</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredLeads.map((lead, i) => (
-                        <tr
-                          key={lead.id || i}
-                          className={i < filteredLeads.length - 1 ? 'border-b border-gray-50' : ''}
-                        >
-                          <td className="px-5 py-3 font-medium text-gray-800">{lead.nome || '—'}</td>
-                          <td className="px-5 py-3 text-gray-500">{lead.email || '—'}</td>
-                          <td className="px-5 py-3 text-gray-500 hidden sm:table-cell">{lead.telefono || '—'}</td>
-                          <td className="px-5 py-3 text-center hidden md:table-cell">
-                            {lead.marketing_consent === true ? (
-                              <span className="inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">Si</span>
-                            ) : lead.marketing_consent === false ? (
-                              <span className="inline-block bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full">No</span>
-                            ) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3 text-gray-400 text-xs hidden lg:table-cell">
-                            {lead.prima_volta ? formatDateIT(lead.prima_volta) : '—'}
-                          </td>
-                          <td className="px-5 py-3 text-gray-400 text-xs hidden lg:table-cell">
-                            {lead.ultima_volta ? formatDateIT(lead.ultima_volta) : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
         </main>
       </div>
 
-      {/* ── Upload Modal ──────────────────────────────────────────────────────── */}
+      {/* ── Upload Modal (Apple-style) ──────────────────────────────────────── */}
       {showUploadModal && (
         <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
           onClick={() => { setShowUploadModal(false); resetUploadModal() }}
         >
           <div
-            className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+            className="bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl max-h-[92vh] overflow-y-auto"
+            style={{ boxShadow: '0 -4px 40px rgba(0,0,0,0.12)' }}
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Nuovo Documento da Firmare</h2>
+            {/* Header */}
+            <div className="sticky top-0 bg-white/90 backdrop-blur-xl border-b border-gray-100 px-5 py-4 flex items-center justify-between z-10">
+              <h2 className="text-[17px] font-semibold text-gray-900">Nuovo Documento</h2>
+              <button
+                onClick={() => { setShowUploadModal(false); resetUploadModal() }}
+                className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
-              <form onSubmit={handleUploadAndSend} className="space-y-5">
+            <form onSubmit={handleUploadAndSend} className="px-5 pb-5">
 
-                {/* File */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Documento PDF</label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf"
-                    onChange={e => setSelectedFile(e.target.files?.[0] || null)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:border-green-500"
-                    required
-                  />
+              {/* File upload */}
+              <div className="py-4 border-b border-gray-100">
+                <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-2">Documento PDF</label>
+                {!selectedFile ? (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-8 flex flex-col items-center gap-2 hover:border-green-400 hover:bg-green-50/30 transition-all"
+                  >
+                    <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                    <span className="text-sm text-gray-400">Tocca per selezionare un PDF</span>
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 bg-green-50 rounded-xl px-4 py-3">
+                    <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                    </svg>
+                    <span className="text-sm text-green-800 font-medium truncate flex-1">{selectedFile.name}</span>
+                    <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="text-green-600 hover:text-red-500 transition-colors">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+                <input ref={fileInputRef} type="file" accept=".pdf" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+              </div>
+
+              {/* Firmatari section */}
+              <div className="py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-[13px] font-medium text-gray-500 uppercase tracking-wide">Firmatari</label>
+                  {signerRows.length > 0 && (
+                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{signerRows.length}</span>
+                  )}
                 </div>
 
-                {/* Destinatari */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">Destinatari</label>
-                    <span className="text-xs text-gray-400">Min. 1 richiesto</span>
-                  </div>
-
-                  <div className="space-y-3">
-                    {signerRows.map((row, index) => (
-                      <div key={index} className="relative border border-gray-200 rounded-xl p-3 bg-gray-50/50">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                            Firmatario {index + 1}
+                {/* Added signers as cards */}
+                {signerRows.length > 0 && (
+                  <div className="space-y-2 mb-4">
+                    {signerRows.map((signer, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
+                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-green-700">
+                            {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
                           </span>
-                          {signerRows.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => removeSignerRow(index)}
-                              className="p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                              aria-label="Rimuovi firmatario"
-                            >
-                              <IconTrash className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
-
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={row.name}
-                            onChange={e => updateSignerRow(index, 'name', e.target.value)}
-                            placeholder="Nome e Cognome"
-                            required
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-green-500 bg-white"
-                          />
-
-                          <div className="relative">
-                            <input
-                              type="email"
-                              value={row.email}
-                              onChange={e => updateSignerRow(index, 'email', e.target.value)}
-                              onFocus={() => {
-                                if (row.email.length >= 2) {
-                                  const q = row.email.toLowerCase()
-                                  setContactSuggestions(contacts.filter(c =>
-                                    c.email.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
-                                  ).slice(0, 6))
-                                  setActiveSuggestionIndex(index)
-                                }
-                              }}
-                              onBlur={() => setTimeout(() => { setContactSuggestions([]); setActiveSuggestionIndex(null) }, 150)}
-                              placeholder="email@esempio.com"
-                              required
-                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-green-500 bg-white"
-                            />
-                            {activeSuggestionIndex === index && contactSuggestions.length > 0 && (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-10 overflow-hidden">
-                                {contactSuggestions.map(contact => (
-                                  <button
-                                    key={contact.id}
-                                    type="button"
-                                    onMouseDown={() => applySuggestion(index, contact)}
-                                    className="w-full text-left px-3 py-2.5 hover:bg-green-50 transition-colors border-b border-gray-50 last:border-0"
-                                  >
-                                    <span className="text-sm font-medium text-gray-800 block">{contact.name}</span>
-                                    <span className="text-xs text-gray-400">{contact.email}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          <input
-                            type="tel"
-                            value={row.phone}
-                            onChange={e => updateSignerRow(index, 'phone', e.target.value)}
-                            placeholder="+39 347 1234567 (opzionale)"
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-green-500 bg-white"
-                          />
-
-                          {/* Channel selector */}
-                          <div className="flex gap-3 pt-1">
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <input
-                                type="radio"
-                                name={`channel-${index}`}
-                                checked={row.channel === 'email'}
-                                onChange={() => updateSignerRow(index, 'channel', 'email')}
-                                className="h-3.5 w-3.5 text-green-600 border-gray-300"
-                              />
-                              <span className="text-xs text-gray-600">Email</span>
-                            </label>
-                            <label className="flex items-center gap-1.5 cursor-pointer">
-                              <input
-                                type="radio"
-                                name={`channel-${index}`}
-                                checked={row.channel === 'whatsapp'}
-                                onChange={() => updateSignerRow(index, 'channel', 'whatsapp')}
-                                className="h-3.5 w-3.5 text-green-600 border-gray-300"
-                              />
-                              <span className="text-xs text-gray-600">WhatsApp</span>
-                            </label>
-                          </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{signer.name}</p>
+                          <p className="text-xs text-gray-400 truncate">{signer.email} · {signer.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}</p>
                         </div>
+                        <button type="button" onClick={() => removeSignerRow(i)} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
                     ))}
                   </div>
+                )}
 
-                  <button
-                    type="button"
-                    onClick={addSignerRow}
-                    className="mt-3 flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium transition-colors"
-                  >
-                    <IconPlus className="w-4 h-4" />
-                    Aggiungi destinatario
-                  </button>
-                </div>
+                {/* Search / add signer */}
+                {!showNewForm ? (
+                  <div className="relative">
+                    <div className="flex gap-2">
+                      <div className="flex-1 relative">
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                        <input
+                          type="text"
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          placeholder="Cerca un contatto..."
+                          className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNewForm(true)}
+                        className="px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
+                      >
+                        Nuovo
+                      </button>
+                    </div>
 
-                {/* Actions */}
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="submit"
-                    disabled={uploading}
-                    className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold py-3 rounded-lg transition-colors"
-                  >
-                    {uploading ? 'Invio...' : 'Invia per Firma'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowUploadModal(false); resetUploadModal() }}
-                    className="px-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 rounded-lg transition-colors"
-                  >
-                    Annulla
-                  </button>
-                </div>
-              </form>
-            </div>
+                    {/* Contact suggestions */}
+                    {filteredContactsForSearch.length > 0 && (
+                      <div className="absolute top-full left-0 right-16 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                        {filteredContactsForSearch.map(contact => (
+                          <button
+                            key={contact.id}
+                            type="button"
+                            onClick={() => addSignerFromContact(contact)}
+                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-gray-500">
+                                {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                              <p className="text-xs text-gray-400 truncate">{contact.email}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* New signer form */
+                  <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[13px] font-semibold text-gray-700">Nuovo firmatario</span>
+                      <button type="button" onClick={() => setShowNewForm(false)} className="text-xs text-gray-400 hover:text-gray-600">Annulla</button>
+                    </div>
+                    <input
+                      type="text"
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder="Nome e Cognome"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                      autoFocus
+                    />
+                    <input
+                      type="email"
+                      value={newEmail}
+                      onChange={e => setNewEmail(e.target.value)}
+                      placeholder="email@esempio.com"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                    <input
+                      type="tel"
+                      value={newPhone}
+                      onChange={e => setNewPhone(e.target.value)}
+                      placeholder="+39 347 1234567 (opzionale)"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                    {/* Channel */}
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setNewChannel('email')}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${newChannel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >Email</button>
+                      <button type="button" onClick={() => setNewChannel('whatsapp')}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${newChannel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >WhatsApp</button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addSignerFromForm}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
+                    >
+                      Aggiungi
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={uploading || signerRows.length === 0 || !selectedFile}
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px] mt-2"
+              >
+                {uploading ? (
+                  <span className="inline-flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Invio in corso...
+                  </span>
+                ) : `Invia per Firma${signerRows.length > 0 ? ` (${signerRows.length})` : ''}`}
+              </button>
+            </form>
           </div>
         </div>
       )}

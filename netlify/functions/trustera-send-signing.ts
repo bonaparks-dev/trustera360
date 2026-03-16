@@ -39,7 +39,7 @@ async function sendWhatsAppSigningLink(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chatId,
-        message: `Ciao ${signerName},\n\n*${senderName}* ti ha inviato un documento da firmare: *${documentName}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 7 giorni.\n\n_Trustera - Infrastructure for Digital Trust_`
+        message: `Ciao ${signerName},\n\n*${senderName}* ti ha inviato un documento da firmare: *${documentName}*\n\nClicca qui per firmarlo:\n${signingUrl}\n\nIl link scade tra 12 ore.\n\n_Trustera - Infrastructure for Digital Trust_`
       })
     })
     const data = await res.json()
@@ -91,7 +91,7 @@ function buildSigningEmailHtml(signerName: string, senderName: string, documentN
           </tr>
           <tr>
             <td style="padding: 0 40px 24px; text-align: center;">
-              <p style="margin: 0; color: #999; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px;">Questo link scade tra 7 giorni.</p>
+              <p style="margin: 0; color: #999; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 12px;">Questo link scade tra 12 ore.</p>
             </td>
           </tr>
           <tr>
@@ -160,7 +160,7 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString() // 12 hours
 
     // Process each signer
     for (const signer of signers) {
@@ -233,24 +233,26 @@ export const handler: Handler = async (event) => {
         console.warn('[trustera-send-signing] Lead upsert failed:', leadError.message)
       }
 
-      // Send WhatsApp if phone provided
-      if (signer.phone) {
-        await sendWhatsAppSigningLink(signer.phone, signer.name, senderName, doc.name, signingUrl)
-      }
+      // Send via chosen channel (or both if no channel specified)
+      const channel = signer.channel || 'email'
 
-      // Send email via Resend
-      try {
-        await resend.emails.send({
-          from: 'Trustera <info@trustera360.app>',
-          replyTo: 'info@trustera360.app',
-          to: signer.email,
-          subject: `${senderName} ti ha inviato un documento da firmare`,
-          text: `Ciao ${signer.name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 7 giorni.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
-          html: buildSigningEmailHtml(signer.name, senderName, doc.name, signingUrl)
-        })
-      } catch (emailErr: any) {
-        console.error('[trustera-send-signing] Email send failed for', signer.email, ':', emailErr.message)
-        throw emailErr
+      if (channel === 'whatsapp' && signer.phone) {
+        await sendWhatsAppSigningLink(signer.phone, signer.name, senderName, doc.name, signingUrl)
+      } else {
+        // Default: send email
+        try {
+          await resend.emails.send({
+            from: 'Trustera <info@trustera360.app>',
+            replyTo: 'info@trustera360.app',
+            to: signer.email,
+            subject: `${senderName} ti ha inviato un documento da firmare`,
+            text: `Ciao ${signer.name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 12 ore.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+            html: buildSigningEmailHtml(signer.name, senderName, doc.name, signingUrl)
+          })
+        } catch (emailErr: any) {
+          console.error('[trustera-send-signing] Email send failed for', signer.email, ':', emailErr.message)
+          throw emailErr
+        }
       }
 
       console.log('[trustera-send-signing] Signer processed:', signer.email)

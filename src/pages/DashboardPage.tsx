@@ -56,9 +56,10 @@ interface SignerRow {
   name: string
   email: string
   phone: string
+  channel: 'email' | 'whatsapp'
 }
 
-type SidebarSection = 'documenti' | 'contatti' | 'lead'
+type SidebarSection = 'documenti' | 'contatti'
 type DocTab = 'sent' | 'signed_by_me'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '' }])
+  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', channel: 'email' }])
   const [contactSuggestions, setContactSuggestions] = useState<Contact[]>([])
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<number | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -311,14 +312,14 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   function resetUploadModal() {
     setSelectedFile(null)
-    setSignerRows([{ name: '', email: '', phone: '' }])
+    setSignerRows([{ name: '', email: '', phone: '', channel: 'email' }])
     setContactSuggestions([])
     setActiveSuggestionIndex(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function addSignerRow() {
-    setSignerRows(prev => [...prev, { name: '', email: '', phone: '' }])
+    setSignerRows(prev => [...prev, { name: '', email: '', phone: '', channel: 'email' }])
   }
 
   function removeSignerRow(index: number) {
@@ -344,7 +345,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   function applySuggestion(rowIndex: number, contact: Contact) {
     setSignerRows(prev => prev.map((row, i) =>
       i === rowIndex
-        ? { name: contact.name, email: contact.email, phone: contact.phone || '' }
+        ? { name: contact.name, email: contact.email, phone: contact.phone || '', channel: contact.phone ? 'whatsapp' as const : 'email' as const }
         : row
     ))
     setContactSuggestions([])
@@ -392,6 +393,7 @@ export default function DashboardPage({ session }: { session: Session }) {
             name: s.name.trim(),
             email: s.email.trim(),
             phone: s.phone.trim() || null,
+            channel: s.channel,
           }))
         })
       })
@@ -458,7 +460,6 @@ export default function DashboardPage({ session }: { session: Session }) {
   const navItems: { key: SidebarSection; label: string; Icon: React.FC<{ className?: string }> }[] = [
     { key: 'documenti', label: 'Documenti', Icon: IconDocuments },
     { key: 'contatti', label: 'Contatti', Icon: IconContacts },
-    { key: 'lead', label: 'Lead', Icon: IconLeads },
   ]
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -523,6 +524,17 @@ export default function DashboardPage({ session }: { session: Session }) {
               </button>
             ))}
           </nav>
+          <div className="mt-4 bg-white rounded-xl border border-gray-200 p-2 space-y-1">
+            <a href="/pricing" className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+              Pricing
+            </a>
+            <a href="/privacy" className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+              Privacy & GDPR
+            </a>
+            <a href="/terms" className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-colors">
+              Termini
+            </a>
+          </div>
         </aside>
 
         {/* ── Main content ───────────────────────────────────────────────────── */}
@@ -961,6 +973,30 @@ export default function DashboardPage({ session }: { session: Session }) {
                             placeholder="+39 347 1234567 (opzionale)"
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:border-green-500 bg-white"
                           />
+
+                          {/* Channel selector */}
+                          <div className="flex gap-3 pt-1">
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`channel-${index}`}
+                                checked={row.channel === 'email'}
+                                onChange={() => updateSignerRow(index, 'channel', 'email')}
+                                className="h-3.5 w-3.5 text-green-600 border-gray-300"
+                              />
+                              <span className="text-xs text-gray-600">Email</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`channel-${index}`}
+                                checked={row.channel === 'whatsapp'}
+                                onChange={() => updateSignerRow(index, 'channel', 'whatsapp')}
+                                className="h-3.5 w-3.5 text-green-600 border-gray-300"
+                              />
+                              <span className="text-xs text-gray-600">WhatsApp</span>
+                            </label>
+                          </div>
                         </div>
                       </div>
                     ))}

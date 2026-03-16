@@ -63,6 +63,19 @@ async function buildSignedPdf(
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
+  // Add footer with signer names + "Certificato da Trustera" on ALL existing pages
+  const existingPages = pdfDoc.getPages()
+  const signerNamesList = signers.map(s => s.name).join(', ')
+  for (const existingPage of existingPages) {
+    const { width } = existingPage.getSize()
+    existingPage.drawText(`Firmato da: ${signerNamesList}`, {
+      x: 50, y: 20, size: 7, font, color: rgb(0.4, 0.4, 0.4)
+    })
+    existingPage.drawText('Certificato da Trustera', {
+      x: width - 150, y: 20, size: 7, font, color: rgb(0.09, 0.64, 0.27)
+    })
+  }
+
   // Add one attestation page per signer
   for (const signer of signers) {
     const page = pdfDoc.addPage([595, 842]) // A4

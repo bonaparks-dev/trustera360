@@ -563,6 +563,80 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   // ── Contacts ──────────────────────────────────────────────────────────────
 
+  const importFileRef = useRef<HTMLInputElement>(null)
+
+  function handleExportContacts() {
+    if (contacts.length === 0) { toast.error('Nessun contatto da esportare'); return }
+    const header = 'Nome,Email,Telefono'
+    const rows = contacts.map(c => {
+      const name = c.name.replace(/"/g, '""')
+      const email = c.email.replace(/"/g, '""')
+      const phone = (c.phone || '').replace(/"/g, '""')
+      return `"${name}","${email}","${phone}"`
+    })
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `contatti_trustera_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success(`${contacts.length} contatti esportati`)
+  }
+
+  async function handleImportContacts(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset input so same file can be re-selected
+    if (importFileRef.current) importFileRef.current.value = ''
+
+    try {
+      const text = await file.text()
+      const lines = text.split(/\r?\n/).filter(l => l.trim())
+      if (lines.length < 2) { toast.error('File vuoto o senza dati'); return }
+
+      // Parse CSV (skip header)
+      const imported: { name: string; email: string; phone: string }[] = []
+      for (let i = 1; i < lines.length; i++) {
+        // Handle quoted CSV fields
+        const match = lines[i].match(/(?:"([^"]*(?:""[^"]*)*)"|([^,]*))(?:,(?:"([^"]*(?:""[^"]*)*)"|([^,]*)))?(?:,(?:"([^"]*(?:""[^"]*)*)"|([^,]*)))?/)
+        if (!match) continue
+        const name = (match[1] || match[2] || '').replace(/""/g, '"').trim()
+        const email = (match[3] || match[4] || '').replace(/""/g, '"').trim()
+        const phone = (match[5] || match[6] || '').replace(/""/g, '"').trim()
+        if (name && email && email.includes('@')) {
+          imported.push({ name, email, phone })
+        }
+      }
+
+      if (imported.length === 0) { toast.error('Nessun contatto valido trovato nel file'); return }
+
+      // Upsert each contact
+      const rows = imported.map(c => ({
+        owner_id: session.user.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone || null,
+        updated_at: new Date().toISOString(),
+      }))
+
+      const { error } = await supabase
+        .from('trustera_contacts')
+        .upsert(rows, { onConflict: 'owner_id,email' })
+
+      if (error) {
+        console.error('Import error:', error)
+        toast.error('Errore durante l\'importazione')
+      } else {
+        toast.success(`${imported.length} contatti importati`)
+        loadContacts()
+      }
+    } catch (err: any) {
+      toast.error('Errore nella lettura del file')
+    }
+  }
+
   async function handleDeleteContact(id: string) {
     if (!confirm('Eliminare questo contatto?')) return
     const { error } = await supabase.from('trustera_contacts').delete().eq('id', id)
@@ -995,9 +1069,38 @@ export default function DashboardPage({ session }: { session: Session }) {
           {/* ════════════════ CONTATTI ════════════════ */}
           {section === 'contatti' && (
             <div>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-bold text-gray-800">Contatti</h2>
-                <span className="text-sm text-gray-400">{contacts.length} totali</span>
+              <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-bold text-gray-800">Contatti</h2>
+                  <span className="text-sm text-gray-400">{contacts.length} totali</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => importFileRef.current?.click()}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                    </svg>
+                    Importa
+                  </button>
+                  <input
+                    ref={importFileRef}
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportContacts}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={handleExportContacts}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Esporta
+                  </button>
+                </div>
               </div>
 
               <div className="mb-4">
@@ -1006,7 +1109,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   value={contactSearch}
                   onChange={e => setContactSearch(e.target.value)}
                   placeholder="Cerca per nome o email..."
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
                 />
               </div>
 

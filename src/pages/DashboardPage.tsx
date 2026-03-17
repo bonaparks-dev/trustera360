@@ -1010,6 +1010,39 @@ export default function DashboardPage({ session }: { session: Session }) {
     }
   }
 
+  async function handleRemoveDuplicates() {
+    if (contacts.length === 0) return
+    // Group by name+email (lowercase) — keep the newest (last created_at)
+    const groups = new Map<string, typeof contacts>()
+    for (const c of contacts) {
+      const key = `${c.name.trim().toLowerCase()}|${c.email.trim().toLowerCase()}`
+      const group = groups.get(key) || []
+      group.push(c)
+      groups.set(key, group)
+    }
+    const toDelete: string[] = []
+    for (const group of groups.values()) {
+      if (group.length <= 1) continue
+      // Sort by created_at desc, keep first (newest), delete rest
+      group.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      for (let i = 1; i < group.length; i++) {
+        toDelete.push(group[i].id)
+      }
+    }
+    if (toDelete.length === 0) { toast.success('Nessun duplicato trovato'); return }
+    if (!confirm(`Trovati ${toDelete.length} duplicati. Eliminare?`)) return
+
+    // Delete in batches
+    let deleted = 0
+    for (let b = 0; b < toDelete.length; b += 50) {
+      const batch = toDelete.slice(b, b + 50)
+      const { error } = await supabase.from('trustera_contacts').delete().in('id', batch)
+      if (!error) deleted += batch.length
+    }
+    toast.success(`${deleted} duplicati rimossi`)
+    loadContacts()
+  }
+
   async function handleDeleteContact(id: string) {
     if (!confirm('Eliminare questo contatto?')) return
     const { error } = await supabase.from('trustera_contacts').delete().eq('id', id)
@@ -1597,6 +1630,15 @@ export default function DashboardPage({ session }: { session: Session }) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
                     {selectedContacts.size > 0 ? `Esporta (${selectedContacts.size})` : 'Esporta'}
+                  </button>
+                  <button
+                    onClick={handleRemoveDuplicates}
+                    className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                    </svg>
+                    Rimuovi duplicati
                   </button>
                 </div>
               </div>

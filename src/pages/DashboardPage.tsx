@@ -262,62 +262,49 @@ export default function DashboardPage({ session }: { session: Session }) {
   // ── Upload modal ──────────────────────────────────────────────────────────
 
   // ── Modal state ──
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newEmail, setNewEmail] = useState('')
-  const [newPhone, setNewPhone] = useState('')
-  const [newChannel, setNewChannel] = useState<'email' | 'whatsapp'>('email')
+  const [signerCount, setSignerCount] = useState(0) // 0 = not yet chosen
+  const [focusedSignerField, setFocusedSignerField] = useState<{ index: number; field: 'email' | 'name' } | null>(null)
 
   function resetUploadModal() {
     setSelectedFile(null)
     setSignerRows([])
-    setSearchQuery('')
-    setShowNewForm(false)
-    setNewName('')
-    setNewEmail('')
-    setNewPhone('')
-    setNewChannel('email')
+    setSignerCount(0)
+    setFocusedSignerField(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  function addSignerFromForm() {
-    if (!newName.trim() || !newEmail.trim()) { toast.error('Nome e email richiesti'); return }
-    setSignerRows(prev => [...prev, { name: newName.trim(), email: newEmail.trim(), phone: newPhone.trim(), channel: newChannel }])
-    setNewName('')
-    setNewEmail('')
-    setNewPhone('')
-    setNewChannel('email')
-    setShowNewForm(false)
-    setSearchQuery('')
+  function handleSelectSignerCount(count: number) {
+    setSignerCount(count)
+    // Initialize signer rows
+    const rows: SignerRow[] = Array.from({ length: count }, () => ({
+      name: '', email: '', phone: '', channel: 'email'
+    }))
+    setSignerRows(rows)
   }
 
-  function addSignerFromContact(contact: Contact) {
-    // Don't add duplicate
-    if (signerRows.some(s => s.email.toLowerCase() === contact.email.toLowerCase())) {
-      toast.error('Contatto gia aggiunto')
-      return
-    }
-    setSignerRows(prev => [...prev, {
+  function updateSignerRow(index: number, field: keyof SignerRow, value: string) {
+    setSignerRows(prev => prev.map((r, i) => i === index ? { ...r, [field]: value } : r))
+  }
+
+  function applyContactToSigner(index: number, contact: Contact) {
+    setSignerRows(prev => prev.map((r, i) => i === index ? {
+      ...r,
       name: contact.name,
       email: contact.email,
       phone: contact.phone || '',
       channel: contact.phone ? 'whatsapp' : 'email'
-    }])
-    setSearchQuery('')
+    } : r))
+    setFocusedSignerField(null)
   }
 
-  function removeSignerRow(index: number) {
-    setSignerRows(prev => prev.filter((_, i) => i !== index))
+  function getContactSuggestions(query: string, currentIndex: number): Contact[] {
+    if (query.length < 1) return []
+    const q = query.toLowerCase()
+    return contacts.filter(c => {
+      const usedByOther = signerRows.some((s, i) => i !== currentIndex && s.email.toLowerCase() === c.email.toLowerCase())
+      return !usedByOther && (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+    }).slice(0, 5)
   }
-
-  const filteredContactsForSearch = searchQuery.length >= 1
-    ? contacts.filter(c => {
-        const q = searchQuery.toLowerCase()
-        const alreadyAdded = signerRows.some(s => s.email.toLowerCase() === c.email.toLowerCase())
-        return !alreadyAdded && (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
-      }).slice(0, 5)
-    : []
 
   async function handleUploadAndOpenEditor(e: React.FormEvent) {
     e.preventDefault()
@@ -900,131 +887,109 @@ export default function DashboardPage({ session }: { session: Session }) {
 
               {/* Firmatari section */}
               <div className="py-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-[13px] font-medium text-gray-500 uppercase tracking-wide">Firmatari</label>
-                  {signerRows.length > 0 && (
-                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">{signerRows.length}</span>
-                  )}
-                </div>
+                <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-3">Firmatari</label>
 
-                {/* Added signers as cards */}
-                {signerRows.length > 0 && (
-                  <div className="space-y-2 mb-4">
-                    {signerRows.map((signer, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-green-700">
-                            {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?'}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{signer.name}</p>
-                          <p className="text-xs text-gray-400 truncate">{signer.email} · {signer.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}</p>
-                        </div>
-                        <button type="button" onClick={() => removeSignerRow(i)} className="p-1 text-gray-300 hover:text-red-500 transition-colors flex-shrink-0">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Search / add signer */}
-                {!showNewForm ? (
-                  <div className="relative">
+                {/* Step 1: Select number of signers */}
+                {signerCount === 0 ? (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-3">Quanti firmatari?</p>
                     <div className="flex gap-2">
-                      <div className="flex-1 relative">
-                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
-                        <input
-                          type="text"
-                          value={searchQuery}
-                          onChange={e => setSearchQuery(e.target.value)}
-                          placeholder="Cerca un contatto..."
-                          className="w-full pl-9 pr-3 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowNewForm(true)}
-                        className="px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white text-sm font-semibold rounded-xl transition-colors flex-shrink-0"
-                      >
-                        Nuovo
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => handleSelectSignerCount(n)}
+                          className="flex-1 py-3 rounded-xl text-sm font-semibold bg-gray-50 hover:bg-green-50 hover:text-green-700 border border-gray-200 hover:border-green-300 text-gray-700 transition-all"
+                        >
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Change count */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">{signerCount} firmatari{signerCount > 1 ? 'o' : ''}</span>
+                      <button type="button" onClick={() => { setSignerCount(0); setSignerRows([]) }} className="text-xs text-gray-400 hover:text-gray-600">
+                        Cambia
                       </button>
                     </div>
 
-                    {/* Contact suggestions */}
-                    {filteredContactsForSearch.length > 0 && (
-                      <div className="absolute top-full left-0 right-16 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
-                        {filteredContactsForSearch.map(contact => (
-                          <button
-                            key={contact.id}
-                            type="button"
-                            onClick={() => addSignerFromContact(contact)}
-                            className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
-                          >
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-gray-500">
-                                {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                              </span>
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                              <p className="text-xs text-gray-400 truncate">{contact.email}</p>
-                            </div>
-                          </button>
-                        ))}
+                    {/* Step 2+3: For each signer — channel, then email (with autocomplete), name, phone */}
+                    {signerRows.map((signer, i) => (
+                      <div key={i} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
+                        <p className="text-[13px] font-semibold text-gray-700">Firmatario {i + 1}</p>
+
+                        {/* Channel toggle */}
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => updateSignerRow(i, 'channel', 'email')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${signer.channel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                          >Email</button>
+                          <button type="button" onClick={() => updateSignerRow(i, 'channel', 'whatsapp')}
+                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${signer.channel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                          >WhatsApp</button>
+                        </div>
+
+                        {/* Email with autocomplete */}
+                        <div className="relative">
+                          <input
+                            type="email"
+                            value={signer.email}
+                            onChange={e => updateSignerRow(i, 'email', e.target.value)}
+                            onFocus={() => setFocusedSignerField({ index: i, field: 'email' })}
+                            onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
+                            placeholder="email@esempio.com"
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                          />
+                          {/* Contact suggestions dropdown */}
+                          {focusedSignerField?.index === i && focusedSignerField?.field === 'email' && (() => {
+                            const suggestions = getContactSuggestions(signer.email, i)
+                            if (suggestions.length === 0) return null
+                            return (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                                {suggestions.map(contact => (
+                                  <button
+                                    key={contact.id}
+                                    type="button"
+                                    onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
+                                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-gray-500">
+                                        {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                                      <p className="text-xs text-gray-400 truncate">{contact.email}{contact.phone ? ` · ${contact.phone}` : ''}</p>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </div>
+
+                        {/* Name */}
+                        <input
+                          type="text"
+                          value={signer.name}
+                          onChange={e => updateSignerRow(i, 'name', e.target.value)}
+                          placeholder="Nome e Cognome"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                        />
+
+                        {/* Phone (show always for WhatsApp, optional for email) */}
+                        <input
+                          type="tel"
+                          value={signer.phone}
+                          onChange={e => updateSignerRow(i, 'phone', e.target.value)}
+                          placeholder={signer.channel === 'whatsapp' ? '+39 347 1234567' : '+39 347 1234567 (opzionale)'}
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                        />
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  /* New signer form */
-                  <div className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[13px] font-semibold text-gray-700">Nuovo firmatario</span>
-                      <button type="button" onClick={() => setShowNewForm(false)} className="text-xs text-gray-400 hover:text-gray-600">Annulla</button>
-                    </div>
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={e => setNewName(e.target.value)}
-                      placeholder="Nome e Cognome"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                      autoFocus
-                    />
-                    <input
-                      type="email"
-                      value={newEmail}
-                      onChange={e => setNewEmail(e.target.value)}
-                      placeholder="email@esempio.com"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                    />
-                    <input
-                      type="tel"
-                      value={newPhone}
-                      onChange={e => setNewPhone(e.target.value)}
-                      placeholder="+39 347 1234567 (opzionale)"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                    />
-                    {/* Channel */}
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setNewChannel('email')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${newChannel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                      >Email</button>
-                      <button type="button" onClick={() => setNewChannel('whatsapp')}
-                        className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${newChannel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                      >WhatsApp</button>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={addSignerFromForm}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition-colors"
-                    >
-                      Aggiungi
-                    </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1033,7 +998,7 @@ export default function DashboardPage({ session }: { session: Session }) {
               <div className="space-y-2 mt-2">
                 <button
                   type="submit"
-                  disabled={uploading || signerRows.length === 0 || !selectedFile}
+                  disabled={uploading || signerCount === 0 || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
                 >
                   {uploading ? (
@@ -1041,12 +1006,12 @@ export default function DashboardPage({ session }: { session: Session }) {
                       <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                       Caricamento...
                     </span>
-                  ) : `Posiziona Campi e Invia${signerRows.length > 0 ? ` (${signerRows.length})` : ''}`}
+                  ) : `Posiziona Campi e Invia${signerCount > 0 ? ` (${signerCount})` : ''}`}
                 </button>
                 <button
                   type="button"
                   onClick={handleSendWithoutFields}
-                  disabled={uploading || signerRows.length === 0 || !selectedFile}
+                  disabled={uploading || signerCount === 0 || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
                   className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
                 >
                   Invia senza campi

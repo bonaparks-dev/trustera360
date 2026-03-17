@@ -54,6 +54,8 @@ interface SignerRow {
 
 type SidebarSection = 'documenti' | 'contatti'
 type DocTab = 'sent' | 'signed_by_me'
+type DocFilter = 'tutte' | 'in_corso' | 'completate' | 'bozza'
+type SortOption = 'created_desc' | 'created_asc' | 'signed_desc' | 'signed_asc' | 'name_asc' | 'name_desc'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -132,6 +134,10 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [docsLoading, setDocsLoading] = useState(true)
   const [activeDocTab, setActiveDocTab] = useState<DocTab>('sent')
   const [expandedDocIds, setExpandedDocIds] = useState<Set<string>>(new Set())
+  const [docFilter, setDocFilter] = useState<DocFilter>('tutte')
+  const [docSort, setDocSort] = useState<SortOption>('created_desc')
+  const [docSearch, setDocSearch] = useState('')
+  const [showSortMenu, setShowSortMenu] = useState(false)
 
   // Upload modal
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -578,11 +584,50 @@ export default function DashboardPage({ session }: { session: Session }) {
   // ── Computed ──────────────────────────────────────────────────────────────
 
   const totalSent = sentDocuments.length
+  const draftCount = sentDocuments.filter(d => d.status === 'draft' || d.status === 'scheduled').length
   const pendingCount = sentDocuments.filter(d => d.status === 'pending').length
   const signedSentCount = sentDocuments.filter(d => d.status === 'signed').length
   const signedByMeCount = signedByMeDocuments.length
 
-  const activeDocuments = activeDocTab === 'sent' ? sentDocuments : signedByMeDocuments
+  // Filter documents
+  const baseDocuments = activeDocTab === 'sent' ? sentDocuments : signedByMeDocuments
+  const filteredDocuments = baseDocuments.filter(doc => {
+    // Status filter
+    if (docFilter === 'in_corso' && doc.status !== 'pending') return false
+    if (docFilter === 'completate' && doc.status !== 'signed') return false
+    if (docFilter === 'bozza' && doc.status !== 'draft' && doc.status !== 'scheduled') return false
+    // Search
+    if (docSearch) {
+      const q = docSearch.toLowerCase()
+      const nameMatch = doc.name.toLowerCase().includes(q)
+      const signerMatch = doc.signers?.some(s => s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
+      const legacyMatch = doc.signer_name?.toLowerCase().includes(q) || doc.signer_email?.toLowerCase().includes(q)
+      if (!nameMatch && !signerMatch && !legacyMatch) return false
+    }
+    return true
+  })
+
+  // Sort documents
+  const activeDocuments = [...filteredDocuments].sort((a, b) => {
+    switch (docSort) {
+      case 'created_desc': return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      case 'created_asc': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      case 'signed_desc': return (b.signed_at ? new Date(b.signed_at).getTime() : 0) - (a.signed_at ? new Date(a.signed_at).getTime() : 0)
+      case 'signed_asc': return (a.signed_at ? new Date(a.signed_at).getTime() : 0) - (b.signed_at ? new Date(b.signed_at).getTime() : 0)
+      case 'name_asc': return a.name.localeCompare(b.name)
+      case 'name_desc': return b.name.localeCompare(a.name)
+      default: return 0
+    }
+  })
+
+  const sortLabels: Record<SortOption, string> = {
+    created_desc: 'Data di creazione (recente)',
+    created_asc: 'Data di creazione (vecchia)',
+    signed_desc: 'Data della firma (recente)',
+    signed_asc: 'Data della firma (vecchia)',
+    name_asc: 'Nome (A-Z)',
+    name_desc: 'Nome (Z-A)',
+  }
 
   const filteredContacts = contacts.filter(c => {
     const q = contactSearch.toLowerCase()
@@ -677,35 +722,13 @@ export default function DashboardPage({ session }: { session: Session }) {
           {/* ════════════════ DOCUMENTI ════════════════ */}
           {section === 'documenti' && (
             <div>
-              {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <p className="text-xs text-gray-500 mb-1">Documenti inviati</p>
-                  <p className="text-2xl font-bold text-gray-800">{totalSent}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <p className="text-xs text-gray-500 mb-1">In attesa</p>
-                  <p className="text-2xl font-bold text-yellow-600">{pendingCount}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <p className="text-xs text-gray-500 mb-1">Firmati (inviati)</p>
-                  <p className="text-2xl font-bold text-green-600">{signedSentCount}</p>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <p className="text-xs text-gray-500 mb-1">Firmati da me</p>
-                  <p className="text-2xl font-bold text-green-600">{signedByMeCount}</p>
-                </div>
-              </div>
-
-              {/* Sub-tabs + action */}
-              <div className="flex items-center justify-between mb-5 gap-3">
+              {/* Sent / Signed by me tabs + new button */}
+              <div className="flex items-center justify-between mb-4 gap-3">
                 <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
                   <button
                     onClick={() => setActiveDocTab('sent')}
                     className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
-                      activeDocTab === 'sent'
-                        ? 'bg-white text-gray-800 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
+                      activeDocTab === 'sent' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
                     Inviati ({totalSent})
@@ -713,9 +736,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   <button
                     onClick={() => setActiveDocTab('signed_by_me')}
                     className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
-                      activeDocTab === 'signed_by_me'
-                        ? 'bg-white text-gray-800 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-700'
+                      activeDocTab === 'signed_by_me' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
                     Firmati da me ({signedByMeCount})
@@ -731,6 +752,81 @@ export default function DashboardPage({ session }: { session: Session }) {
                 )}
               </div>
 
+              {/* Filter tabs (YouSign-style) */}
+              {activeDocTab === 'sent' && (
+                <div className="flex gap-0 border-b border-gray-200 mb-4">
+                  {([
+                    { key: 'tutte' as DocFilter, label: 'Tutte', count: totalSent },
+                    { key: 'in_corso' as DocFilter, label: 'In corso', count: pendingCount },
+                    { key: 'completate' as DocFilter, label: 'Completate', count: signedSentCount },
+                    { key: 'bozza' as DocFilter, label: 'Bozza', count: draftCount },
+                  ]).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setDocFilter(tab.key)}
+                      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        docFilter === tab.key
+                          ? 'border-green-600 text-green-700'
+                          : 'border-transparent text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {tab.label} {tab.count > 0 && <span className="text-xs ml-1 opacity-60">({tab.count})</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Search + Sort bar */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 relative">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={docSearch}
+                    onChange={e => setDocSearch(e.target.value)}
+                    placeholder="Cerca per nome documento o firmatario..."
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 transition-all"
+                  />
+                </div>
+
+                {/* Sort dropdown */}
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setShowSortMenu(!showSortMenu)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-600 bg-white hover:bg-gray-50 transition-colors"
+                  >
+                    Ordina per
+                    <svg className={`w-3.5 h-3.5 transition-transform ${showSortMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {showSortMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-72 overflow-hidden">
+                      {(Object.entries(sortLabels) as [SortOption, string][]).map(([key, label]) => (
+                        <button
+                          key={key}
+                          onClick={() => { setDocSort(key); setShowSortMenu(false) }}
+                          className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 transition-colors flex items-center justify-between border-b border-gray-50 last:border-0"
+                        >
+                          <span className={docSort === key ? 'text-green-700 font-medium' : 'text-gray-700'}>{label}</span>
+                          {docSort === key && (
+                            <svg className="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Count */}
+              <p className="text-xs text-gray-400 mb-3">{activeDocuments.length} di {baseDocuments.length} documenti</p>
+
               {/* Document list */}
               {docsLoading ? (
                 <div className="text-center py-16">
@@ -738,7 +834,9 @@ export default function DashboardPage({ session }: { session: Session }) {
                 </div>
               ) : activeDocuments.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-xl border border-gray-200">
-                  {activeDocTab === 'sent' ? (
+                  {docFilter !== 'tutte' || docSearch ? (
+                    <p className="text-gray-400 text-lg">Nessun risultato</p>
+                  ) : activeDocTab === 'sent' ? (
                     <>
                       <p className="text-gray-400 text-lg mb-4">Nessun documento inviato</p>
                       <button
@@ -753,110 +851,137 @@ export default function DashboardPage({ session }: { session: Session }) {
                   )}
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
                   {activeDocuments.map(doc => {
                     const isExpanded = expandedDocIds.has(doc.id)
-                    const hasMultipleSigners = doc.signers && doc.signers.length > 1
-                    const progress = getSignerProgress(doc)
+                    const signers = doc.signers && doc.signers.length > 0
+                      ? doc.signers
+                      : doc.signer_name
+                        ? [{ id: 'legacy', document_id: doc.id, name: doc.signer_name!, email: doc.signer_email!, status: doc.status === 'signed' ? 'signed' as const : 'pending' as const, signed_at: doc.signed_at }]
+                        : []
 
                     return (
-                      <div key={doc.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                        {/* Main row */}
-                        <div className="p-5">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <h3 className="font-semibold text-gray-800 truncate">{doc.name}</h3>
-                                <span className={`text-xs text-white px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${statusColors[doc.status]}`}>
-                                  {statusLabels[doc.status]}
+                      <div key={doc.id}>
+                        <div
+                          className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                          onClick={() => setExpandedDocIds(prev => {
+                            const next = new Set(prev)
+                            if (next.has(doc.id)) next.delete(doc.id)
+                            else next.add(doc.id)
+                            return next
+                          })}
+                        >
+                          {/* Left: doc info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <h3 className="font-semibold text-gray-800 truncate text-sm">{doc.name}</h3>
+                              {doc.signers && doc.signers.length > 0 && (
+                                <span className="text-xs text-gray-400 flex-shrink-0">{doc.signers.length}</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              {formatDateIT(doc.created_at)}
+                              {activeDocTab === 'sent' && <span className="mx-1.5">|</span>}
+                              {activeDocTab === 'sent' && <span>Da me</span>}
+                            </p>
+                          </div>
+
+                          {/* Center: signer status icons */}
+                          <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+                            {signers.map((signer, si) => (
+                              <div key={signer.id || si} className="flex items-center gap-1" title={`${signer.name} — ${signer.status === 'signed' ? 'Firmato' : 'In attesa'}`}>
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+                                  signer.status === 'signed' ? 'bg-green-500' : 'bg-yellow-400'
+                                }`}>
+                                  {signer.status === 'signed' ? (
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                  ) : (
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>
+                                  )}
+                                </span>
+                                <span className="text-xs text-gray-500 max-w-[100px] truncate">
+                                  {signer.name.split(' ').map(w => w[0] + '.').join(' ')}
                                 </span>
                               </div>
+                            ))}
+                          </div>
 
-                              {activeDocTab === 'sent' ? (
-                                doc.signers && doc.signers.length > 0 ? (
-                                  <p className="text-sm text-gray-500">
-                                    {doc.signers.length === 1
-                                      ? `${doc.signers[0].name} (${doc.signers[0].email})`
-                                      : `${doc.signers.length} firmatari — ${progress.signed}/${progress.total} firmati`
-                                    }
-                                  </p>
-                                ) : (
-                                  <p className="text-sm text-gray-500">
-                                    {doc.signer_name} ({doc.signer_email})
-                                  </p>
-                                )
-                              ) : (
-                                <p className="text-sm text-gray-500">
-                                  {doc.source === 'dr7_contract' ? 'Contratto DR7 Empire' :
-                                   doc.source === 'dr7_trustera' ? 'Documento DR7' :
-                                   'Documento Trustera'}
-                                </p>
-                              )}
-
-                              <p className="text-xs text-gray-400 mt-1">
-                                {activeDocTab === 'sent'
-                                  ? formatDateIT(doc.created_at)
-                                  : doc.signed_at
-                                    ? `Firmato il ${formatDateIT(doc.signed_at)}`
-                                    : formatDateIT(doc.created_at)
-                                }
-                                {activeDocTab === 'sent' && doc.signed_at &&
-                                  ` — Firmato il ${formatDateIT(doc.signed_at)}`
-                                }
-                              </p>
+                          {/* Right: status + actions */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-2 h-2 rounded-full ${statusColors[doc.status]}`} />
+                              <span className="text-sm font-medium text-gray-600">{statusLabels[doc.status]}</span>
                             </div>
-
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {(doc.signed_pdf_url || doc.pdf_url) && (
-                                <a
-                                  href={doc.signed_pdf_url || doc.pdf_url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
-                                >
-                                  {doc.signed_pdf_url ? 'PDF Firmato' : 'PDF'}
-                                </a>
-                              )}
-                              {(hasMultipleSigners || (doc.signers && doc.signers.length === 1)) && (
-                                <button
-                                  onClick={() => setExpandedDocIds(prev => {
-                                    const next = new Set(prev)
-                                    if (next.has(doc.id)) next.delete(doc.id)
-                                    else next.add(doc.id)
-                                    return next
-                                  })}
-                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition-colors"
-                                  aria-label="Espandi firmatari"
-                                >
-                                  <IconChevron open={isExpanded} />
-                                </button>
-                              )}
-                            </div>
+                            {doc.signed_pdf_url && (
+                              <a
+                                href={doc.signed_pdf_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+                                title="Scarica PDF firmato"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                              </a>
+                            )}
+                            <IconChevron open={isExpanded} />
                           </div>
                         </div>
 
-                        {/* Expanded signers */}
-                        {isExpanded && doc.signers && doc.signers.length > 0 && (
-                          <div className="border-t border-gray-100 bg-gray-50 px-5 py-3 space-y-2">
-                            {doc.signers.map(signer => (
-                              <div key={signer.id} className="flex items-center justify-between gap-2">
-                                <div>
-                                  <span className="text-sm font-medium text-gray-700">{signer.name}</span>
-                                  <span className="text-xs text-gray-400 ml-2">{signer.email}</span>
-                                  {signer.phone && <span className="text-xs text-gray-400 ml-2">{signer.phone}</span>}
+                        {/* Expanded: signer details */}
+                        {isExpanded && signers.length > 0 && (
+                          <div className="border-t border-gray-100 bg-gray-50/80 px-5 py-3 space-y-2">
+                            {signers.map((signer, si) => (
+                              <div key={signer.id || si} className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 ${
+                                    signer.status === 'signed' ? 'bg-green-500' : 'bg-yellow-400'
+                                  }`}>
+                                    {signer.status === 'signed' ? (
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    ) : (
+                                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                    )}
+                                  </span>
+                                  <div className="min-w-0">
+                                    <span className="text-sm font-medium text-gray-700">{signer.name}</span>
+                                    <span className="text-xs text-gray-400 ml-2">{signer.email}</span>
+                                  </div>
                                 </div>
-                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                  signer.status === 'signed'
-                                    ? 'bg-green-100 text-green-700'
-                                    : 'bg-yellow-100 text-yellow-700'
-                                }`}>
+                                <span className="text-xs text-gray-400 flex-shrink-0">
                                   {signer.status === 'signed'
-                                    ? `Firmato${signer.signed_at ? ` il ${formatDateIT(signer.signed_at)}` : ''}`
+                                    ? signer.signed_at ? `Firmato il ${formatDateIT(signer.signed_at)}` : 'Firmato'
                                     : 'In attesa'
                                   }
                                 </span>
                               </div>
                             ))}
+
+                            {/* Document actions */}
+                            <div className="flex gap-2 pt-2 border-t border-gray-200 mt-2">
+                              {doc.pdf_url && (
+                                <a
+                                  href={doc.pdf_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-gray-500 hover:text-green-600 font-medium transition-colors"
+                                >
+                                  Vedi originale
+                                </a>
+                              )}
+                              {doc.signed_pdf_url && (
+                                <a
+                                  href={doc.signed_pdf_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-xs text-green-600 hover:text-green-700 font-medium transition-colors"
+                                >
+                                  Scarica firmato
+                                </a>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>

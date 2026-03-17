@@ -879,21 +879,58 @@ export default function DashboardPage({ session }: { session: Session }) {
       const lines = text.split(/\r?\n/).filter(l => l.trim())
       if (lines.length < 2) { toast.error('File vuoto o senza dati'); return }
 
-      // Parse CSV (skip header)
+      // Auto-detect delimiter (; or ,)
+      const headerLine = lines[0]
+      const delimiter = headerLine.includes(';') ? ';' : ','
+
+      // Parse a CSV line respecting quotes
+      function parseCsvLine(line: string): string[] {
+        const result: string[] = []
+        let current = ''
+        let inQuotes = false
+        for (let c = 0; c < line.length; c++) {
+          const ch = line[c]
+          if (inQuotes) {
+            if (ch === '"' && line[c + 1] === '"') { current += '"'; c++; }
+            else if (ch === '"') inQuotes = false
+            else current += ch
+          } else {
+            if (ch === '"') inQuotes = true
+            else if (ch === delimiter) { result.push(current.trim()); current = '' }
+            else current += ch
+          }
+        }
+        result.push(current.trim())
+        return result
+      }
+
+      // Auto-detect columns from header
+      const headers = parseCsvLine(headerLine).map(h => h.toLowerCase().replace(/[^a-z]/g, ''))
+      let nameCol = headers.findIndex(h => h === 'nome' || h === 'name' || h === 'nominativo' || h === 'ragionesociale')
+      let emailCol = headers.findIndex(h => h === 'email' || h === 'mail' || h === 'emailaddress' || h === 'indirizzoemail')
+      let phoneCol = headers.findIndex(h => h === 'telefono' || h === 'phone' || h === 'tel' || h === 'cellulare' || h === 'mobile' || h === 'numero')
+
+      // Fallback: if no header match, assume order: name, email, phone
+      if (nameCol === -1 && emailCol === -1) {
+        nameCol = 0
+        emailCol = headers.length > 1 ? 1 : -1
+        phoneCol = headers.length > 2 ? 2 : -1
+      }
+
+      // Parse data rows
       const imported: { name: string; email: string; phone: string }[] = []
       for (let i = 1; i < lines.length; i++) {
-        // Handle quoted CSV fields
-        const match = lines[i].match(/(?:"([^"]*(?:""[^"]*)*)"|([^,]*))(?:,(?:"([^"]*(?:""[^"]*)*)"|([^,]*)))?(?:,(?:"([^"]*(?:""[^"]*)*)"|([^,]*)))?/)
-        if (!match) continue
-        const name = (match[1] || match[2] || '').replace(/""/g, '"').trim()
-        const email = (match[3] || match[4] || '').replace(/""/g, '"').trim()
-        const phone = (match[5] || match[6] || '').replace(/""/g, '"').trim()
-        if (name && email && email.includes('@')) {
-          imported.push({ name, email, phone })
+        const cols = parseCsvLine(lines[i])
+        const name = (nameCol >= 0 ? cols[nameCol] : '').trim()
+        const email = (emailCol >= 0 ? cols[emailCol] : '').trim()
+        const phone = (phoneCol >= 0 ? cols[phoneCol] : '').trim()
+        // Accept if we have at least a name and (email OR phone)
+        if (name && (email.includes('@') || phone)) {
+          imported.push({ name, email: email.includes('@') ? email : '', phone })
         }
       }
 
-      if (imported.length === 0) { toast.error('Nessun contatto valido trovato nel file'); return }
+      if (imported.length === 0) { toast.error('Nessun contatto valido trovato nel file. Verifica che il CSV abbia colonne: Nome, Email, Telefono'); return }
 
       // Upsert each contact
       const rows = imported.map(c => ({

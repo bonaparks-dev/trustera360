@@ -34,6 +34,8 @@ interface Document {
   source?: string
   // new multi-signer relation
   signers?: Signer[]
+  draft_signers?: SignerRow[] | null
+  scheduled_at?: string | null
 }
 
 interface Contact {
@@ -349,6 +351,8 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [signerCount, setSignerCount] = useState(0) // 0 = not yet chosen
   const [focusedSignerField, setFocusedSignerField] = useState<{ index: number; field: 'email' | 'name' } | null>(null)
   const [useOtp, setUseOtp] = useState(false)
+  const [editingDraftId, setEditingDraftId] = useState<string | null>(null)
+  const [editingDraftPdfUrl, setEditingDraftPdfUrl] = useState<string | null>(null)
 
   function resetUploadModal() {
     setSelectedFile(null)
@@ -358,7 +362,31 @@ export default function DashboardPage({ session }: { session: Session }) {
     setShowSchedulePicker(false)
     setScheduledDateTime('')
     setUseOtp(false)
+    setEditingDraftId(null)
+    setEditingDraftPdfUrl(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleOpenDraft(doc: Document) {
+    resetUploadModal()
+    setEditingDraftId(doc.id)
+    setEditingDraftPdfUrl(doc.pdf_url || null)
+    // Restore signers from draft_signers
+    if (doc.draft_signers && doc.draft_signers.length > 0) {
+      const rows: SignerRow[] = doc.draft_signers.map(s => ({
+        name: s.name || '',
+        email: s.email || '',
+        phone: s.phone || '',
+        countryCode: s.countryCode || '+39',
+        channel: s.channel || 'email',
+      }))
+      setSignerCount(rows.length)
+      setSignerRows(rows)
+    } else {
+      setSignerCount(1)
+      setSignerRows([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email' }])
+    }
+    setShowUploadModal(true)
   }
 
   function handleSelectSignerCount(count: number) {
@@ -414,7 +442,6 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function handleUploadAndOpenEditor(e: React.FormEvent) {
     e.preventDefault()
-    if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
 
     const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
     if (validSigners.length === 0) {
@@ -424,32 +451,53 @@ export default function DashboardPage({ session }: { session: Session }) {
 
     setUploading(true)
     try {
-      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('trustera')
-        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
-      if (uploadError) throw uploadError
+      let publicUrl: string
+      let docId: string
 
-      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+      if (editingDraftId && editingDraftPdfUrl) {
+        // Editing existing draft — use existing PDF (or re-upload if new file selected)
+        if (selectedFile) {
+          const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+          const { error: uploadError } = await supabase.storage
+            .from('trustera')
+            .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+          if (uploadError) throw uploadError
+          publicUrl = supabase.storage.from('trustera').getPublicUrl(fileName).data.publicUrl
+          await supabase.from('trustera_documents').update({ pdf_url: publicUrl, name: selectedFile.name, draft_signers: validSigners }).eq('id', editingDraftId)
+        } else {
+          publicUrl = editingDraftPdfUrl
+          await supabase.from('trustera_documents').update({ draft_signers: validSigners }).eq('id', editingDraftId)
+        }
+        docId = editingDraftId
+      } else {
+        if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+        const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('trustera')
+          .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+        if (uploadError) throw uploadError
+        publicUrl = supabase.storage.from('trustera').getPublicUrl(fileName).data.publicUrl
 
-      const { data: doc, error: insertError } = await supabase
-        .from('trustera_documents')
-        .insert({
-          owner_id: session.user.id,
-          name: selectedFile.name,
-          pdf_url: publicUrl,
-          status: 'draft',
-        })
-        .select()
-        .single()
-      if (insertError) throw insertError
+        const { data: doc, error: insertError } = await supabase
+          .from('trustera_documents')
+          .insert({
+            owner_id: session.user.id,
+            name: selectedFile.name,
+            pdf_url: publicUrl,
+            status: 'draft',
+          })
+          .select()
+          .single()
+        if (insertError) throw insertError
+        docId = doc.id
+      }
 
       // Generate a signed URL for the PDF so react-pdf can load it
       const signedUrl = await getSignedUrl(publicUrl)
 
       // Open field placement editor
       setEditorPdfUrl(signedUrl || publicUrl)
-      setEditorDocumentId(doc.id)
+      setEditorDocumentId(docId)
       setEditorSigners(validSigners)
       setShowUploadModal(false)
       setShowFieldEditor(true)
@@ -462,35 +510,51 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function handleSendWithoutFields() {
     const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
-    if (!selectedFile || validSigners.length === 0) return
+    if (validSigners.length === 0) return
 
     setUploading(true)
     try {
-      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('trustera')
-        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
-      if (uploadError) throw uploadError
+      let publicUrl: string
+      let docId: string
 
-      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+      if (editingDraftId && editingDraftPdfUrl && !selectedFile) {
+        // Use existing draft PDF
+        publicUrl = editingDraftPdfUrl
+        await supabase.from('trustera_documents').update({ status: 'pending', draft_signers: null }).eq('id', editingDraftId)
+        docId = editingDraftId
+      } else {
+        if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+        const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('trustera')
+          .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+        if (uploadError) throw uploadError
+        publicUrl = supabase.storage.from('trustera').getPublicUrl(fileName).data.publicUrl
 
-      const { data: doc, error: insertError } = await supabase
-        .from('trustera_documents')
-        .insert({
-          owner_id: session.user.id,
-          name: selectedFile.name,
-          pdf_url: publicUrl,
-          status: 'pending',
-        })
-        .select()
-        .single()
-      if (insertError) throw insertError
+        if (editingDraftId) {
+          await supabase.from('trustera_documents').update({ pdf_url: publicUrl, name: selectedFile.name, status: 'pending', draft_signers: null }).eq('id', editingDraftId)
+          docId = editingDraftId
+        } else {
+          const { data: doc, error: insertError } = await supabase
+            .from('trustera_documents')
+            .insert({
+              owner_id: session.user.id,
+              name: selectedFile.name,
+              pdf_url: publicUrl,
+              status: 'pending',
+            })
+            .select()
+            .single()
+          if (insertError) throw insertError
+          docId = doc.id
+        }
+      }
 
       const res = await fetch('/.netlify/functions/trustera-send-signing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          documentId: doc.id,
+          documentId: docId,
           signers: validSigners.map(s => ({
             name: s.name.trim(),
             email: s.email.trim(),
@@ -517,31 +581,52 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   async function handleSaveDraft() {
-    if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+    if (!selectedFile && !editingDraftId) { toast.error('Seleziona un file PDF'); return }
     const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
 
     setUploading(true)
     try {
-      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
-      const { error: uploadError } = await supabase.storage
-        .from('trustera')
-        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
-
-      const { error: insertError } = await supabase
-        .from('trustera_documents')
-        .insert({
-          owner_id: session.user.id,
-          name: selectedFile.name,
-          pdf_url: publicUrl,
-          status: 'draft',
+      if (editingDraftId) {
+        // Update existing draft
+        const updates: Record<string, any> = {
           draft_signers: validSigners.length > 0 ? validSigners : null,
-        })
-        .select()
-        .single()
-      if (insertError) throw insertError
+        }
+        if (selectedFile) {
+          const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+          const { error: uploadError } = await supabase.storage
+            .from('trustera')
+            .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+          if (uploadError) throw uploadError
+          updates.pdf_url = supabase.storage.from('trustera').getPublicUrl(fileName).data.publicUrl
+          updates.name = selectedFile.name
+        }
+        const { error: updateError } = await supabase
+          .from('trustera_documents')
+          .update(updates)
+          .eq('id', editingDraftId)
+        if (updateError) throw updateError
+      } else {
+        const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile!.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('trustera')
+          .upload(fileName, selectedFile!, { contentType: 'application/pdf' })
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+
+        const { error: insertError } = await supabase
+          .from('trustera_documents')
+          .insert({
+            owner_id: session.user.id,
+            name: selectedFile!.name,
+            pdf_url: publicUrl,
+            status: 'draft',
+            draft_signers: validSigners.length > 0 ? validSigners : null,
+          })
+          .select()
+          .single()
+        if (insertError) throw insertError
+      }
 
       toast.success('Bozza salvata')
       setShowUploadModal(false)
@@ -1175,6 +1260,17 @@ export default function DashboardPage({ session }: { session: Session }) {
                                 </svg>
                               </a>
                             )}
+                            {(doc.status === 'draft' || doc.status === 'scheduled') && (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleOpenDraft(doc) }}
+                                className="p-1.5 rounded-lg hover:bg-blue-50 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Modifica bozza"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                              </button>
+                            )}
                             {doc.status === 'deleted' ? (
                               <>
                                 <button
@@ -1401,7 +1497,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           >
             {/* Header */}
             <div className="sticky top-0 bg-white/90 backdrop-blur-xl border-b border-gray-100 px-5 py-4 flex items-center justify-between z-10">
-              <h2 className="text-[17px] font-semibold text-gray-900">Nuovo Documento</h2>
+              <h2 className="text-[17px] font-semibold text-gray-900">{editingDraftId ? 'Modifica Bozza' : 'Nuovo Documento'}</h2>
               <button
                 onClick={() => { setShowUploadModal(false); resetUploadModal() }}
                 className="p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
@@ -1417,7 +1513,7 @@ export default function DashboardPage({ session }: { session: Session }) {
               {/* File upload */}
               <div className="py-4 border-b border-gray-100">
                 <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-2">Documento PDF</label>
-                {!selectedFile ? (
+                {!selectedFile && !editingDraftPdfUrl ? (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -1428,6 +1524,16 @@ export default function DashboardPage({ session }: { session: Session }) {
                     </svg>
                     <span className="text-sm text-gray-400">Tocca per selezionare un PDF</span>
                   </button>
+                ) : !selectedFile && editingDraftPdfUrl ? (
+                  <div className="flex items-center gap-3 bg-blue-50 rounded-xl px-4 py-3">
+                    <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                    </svg>
+                    <span className="text-sm text-blue-800 font-medium truncate flex-1">PDF già caricato</span>
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                      Sostituisci
+                    </button>
+                  </div>
                 ) : (
                   <div className="flex items-center gap-3 bg-green-50 rounded-xl px-4 py-3">
                     <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -1621,7 +1727,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   {/* Primary: place fields and send */}
                   <button
                     type="submit"
-                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
+                    disabled={uploading || (!selectedFile && !editingDraftPdfUrl) || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                     className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
                   >
                     {uploading ? (
@@ -1636,7 +1742,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   <button
                     type="button"
                     onClick={handleSendWithoutFields}
-                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
+                    disabled={uploading || (!selectedFile && !editingDraftPdfUrl) || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                     className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
                   >
                     Invia senza campi
@@ -1647,7 +1753,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <button
                       type="button"
                       onClick={handleSaveDraft}
-                      disabled={uploading || !selectedFile}
+                      disabled={uploading || (!selectedFile && !editingDraftPdfUrl)}
                       className="flex-1 border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl transition-all"
                     >
                       Salva Bozza
@@ -1657,7 +1763,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <button
                       type="button"
                       onClick={() => setShowSchedulePicker(!showSchedulePicker)}
-                      disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
+                      disabled={uploading || (!selectedFile && !editingDraftPdfUrl) || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                       className="flex-1 border border-gray-200 hover:border-blue-300 bg-white hover:bg-blue-50 disabled:bg-gray-50 disabled:text-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl transition-all"
                     >
                       Invio Programmato

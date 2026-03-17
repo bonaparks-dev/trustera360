@@ -22,7 +22,7 @@ interface Signer {
 interface Document {
   id: string
   name: string
-  status: 'draft' | 'pending' | 'signed'
+  status: 'draft' | 'scheduled' | 'pending' | 'signed'
   created_at: string
   // legacy single-signer fields
   signer_email?: string
@@ -93,12 +93,14 @@ function IconTrash({ className }: { className?: string }) {
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-400',
+  scheduled: 'bg-blue-500',
   pending: 'bg-yellow-500',
   signed: 'bg-green-600',
 }
 
 const statusLabels: Record<string, string> = {
   draft: 'Bozza',
+  scheduled: 'Programmato',
   pending: 'In attesa',
   signed: 'Firmato',
 }
@@ -137,6 +139,10 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', channel: 'email' }])
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Scheduled send
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false)
+  const [scheduledDateTime, setScheduledDateTime] = useState('')
 
   // Field editor
   const [showFieldEditor, setShowFieldEditor] = useState(false)
@@ -270,6 +276,8 @@ export default function DashboardPage({ session }: { session: Session }) {
     setSignerRows([])
     setSignerCount(0)
     setFocusedSignerField(null)
+    setShowSchedulePicker(false)
+    setScheduledDateTime('')
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -405,6 +413,95 @@ export default function DashboardPage({ session }: { session: Session }) {
       loadDocuments()
     } catch (error: any) {
       toast.error(error.message || 'Errore nel caricamento')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleSaveDraft() {
+    if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+
+    setUploading(true)
+    try {
+      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('trustera')
+        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+
+      const { error: insertError } = await supabase
+        .from('trustera_documents')
+        .insert({
+          owner_id: session.user.id,
+          name: selectedFile.name,
+          pdf_url: publicUrl,
+          status: 'draft',
+          draft_signers: validSigners.length > 0 ? validSigners : null,
+        })
+        .select()
+        .single()
+      if (insertError) throw insertError
+
+      toast.success('Bozza salvata')
+      setShowUploadModal(false)
+      resetUploadModal()
+      loadDocuments()
+    } catch (error: any) {
+      toast.error(error.message || 'Errore nel salvataggio')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleScheduledSend() {
+    if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+    if (!scheduledDateTime) { toast.error('Seleziona data e ora'); return }
+
+    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    if (validSigners.length === 0) {
+      toast.error('Aggiungi almeno un firmatario con nome e email')
+      return
+    }
+
+    const scheduledDate = new Date(scheduledDateTime)
+    if (scheduledDate <= new Date()) {
+      toast.error('La data deve essere nel futuro')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('trustera')
+        .upload(fileName, selectedFile, { contentType: 'application/pdf' })
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage.from('trustera').getPublicUrl(fileName)
+
+      const { error: insertError } = await supabase
+        .from('trustera_documents')
+        .insert({
+          owner_id: session.user.id,
+          name: selectedFile.name,
+          pdf_url: publicUrl,
+          status: 'scheduled',
+          scheduled_at: scheduledDate.toISOString(),
+          draft_signers: validSigners,
+        })
+        .select()
+        .single()
+      if (insertError) throw insertError
+
+      toast.success(`Invio programmato per ${scheduledDate.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`)
+      setShowUploadModal(false)
+      resetUploadModal()
+      loadDocuments()
+    } catch (error: any) {
+      toast.error(error.message || 'Errore nella programmazione')
     } finally {
       setUploading(false)
     }
@@ -995,28 +1092,77 @@ export default function DashboardPage({ session }: { session: Session }) {
               </div>
 
               {/* Submit buttons */}
-              <div className="space-y-2 mt-2">
-                <button
-                  type="submit"
-                  disabled={uploading || signerCount === 0 || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
-                >
-                  {uploading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
-                      Caricamento...
-                    </span>
-                  ) : `Posiziona Campi e Invia${signerCount > 0 ? ` (${signerCount})` : ''}`}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSendWithoutFields}
-                  disabled={uploading || signerCount === 0 || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
-                  className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
-                >
-                  Invia senza campi
-                </button>
-              </div>
+              {signerCount > 0 && (
+                <div className="space-y-2 mt-2">
+                  {/* Primary: place fields and send */}
+                  <button
+                    type="submit"
+                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                    className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
+                  >
+                    {uploading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                        Caricamento...
+                      </span>
+                    ) : `Posiziona Campi e Invia (${signerCount})`}
+                  </button>
+
+                  {/* Send without fields */}
+                  <button
+                    type="button"
+                    onClick={handleSendWithoutFields}
+                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                    className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
+                  >
+                    Invia senza campi
+                  </button>
+
+                  <div className="border-t border-gray-100 pt-3 mt-3 flex gap-2">
+                    {/* Save draft */}
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={uploading || !selectedFile}
+                      className="flex-1 border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 disabled:bg-gray-50 disabled:text-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl transition-all"
+                    >
+                      Salva Bozza
+                    </button>
+
+                    {/* Scheduled send */}
+                    <button
+                      type="button"
+                      onClick={() => setShowSchedulePicker(!showSchedulePicker)}
+                      disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                      className="flex-1 border border-gray-200 hover:border-blue-300 bg-white hover:bg-blue-50 disabled:bg-gray-50 disabled:text-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl transition-all"
+                    >
+                      Invio Programmato
+                    </button>
+                  </div>
+
+                  {/* Schedule datetime picker */}
+                  {showSchedulePicker && (
+                    <div className="border border-blue-200 bg-blue-50/50 rounded-xl p-4 space-y-3">
+                      <p className="text-[13px] font-semibold text-gray-700">Programma invio</p>
+                      <input
+                        type="datetime-local"
+                        value={scheduledDateTime}
+                        onChange={e => setScheduledDateTime(e.target.value)}
+                        min={new Date().toISOString().slice(0, 16)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleScheduledSend}
+                        disabled={uploading || !scheduledDateTime}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-3 rounded-xl transition-colors"
+                      >
+                        Conferma Invio Programmato
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </form>
           </div>
         </div>

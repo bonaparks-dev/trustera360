@@ -959,32 +959,52 @@ export default function DashboardPage({ session }: { session: Session }) {
         }
       }
 
-      // Insert contacts without email (no upsert possible)
-      for (let b = 0; b < withoutEmail.length; b += 50) {
-        const batch = withoutEmail.slice(b, b + 50).map(c => ({
-          owner_id: session.user.id,
-          name: c.name,
-          email: c.phone || `${c.name.toLowerCase().replace(/\s+/g, '.')}@noemail`, // placeholder
-          phone: c.phone || null,
-          updated_at: new Date().toISOString(),
-        }))
-        const { error } = await supabase
-          .from('trustera_contacts')
-          .insert(batch)
-        if (error) {
-          console.error('Import no-email batch error:', error.message)
-          errorCount += batch.length
+      // Insert contacts without email one by one (each needs unique placeholder)
+      for (const c of withoutEmail) {
+        const placeholder = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}@noemail`
+        // Check if contact with same name+phone already exists
+        const lookupPhone = c.phone || null
+        let exists = false
+        if (lookupPhone) {
+          const { data } = await supabase
+            .from('trustera_contacts')
+            .select('id')
+            .eq('owner_id', session.user.id)
+            .eq('phone', lookupPhone)
+            .eq('name', c.name)
+            .maybeSingle()
+          if (data) exists = true
+        }
+        if (!exists) {
+          const { error } = await supabase
+            .from('trustera_contacts')
+            .insert({
+              owner_id: session.user.id,
+              name: c.name,
+              email: placeholder,
+              phone: lookupPhone,
+              updated_at: new Date().toISOString(),
+            })
+          if (error) {
+            console.error('Import no-email error:', error.message)
+            errorCount++
+          } else {
+            successCount++
+          }
         } else {
-          successCount += batch.length
+          successCount++ // already exists, count as success
         }
       }
 
       if (successCount > 0) {
-        toast.success(`${successCount} contatti importati${errorCount > 0 ? ` (${errorCount} errori)` : ''}`)
+        let msg = `${successCount} contatti importati`
+        if (errorCount > 0) msg += `, ${errorCount} errori`
+        toast.success(msg)
         loadContacts()
       } else {
         toast.error('Importazione fallita: verifica il formato del file')
       }
+      console.log(`[Import] Parsed: ${imported.length}, With email: ${withEmail.length}, Without email: ${withoutEmail.length}, Success: ${successCount}, Errors: ${errorCount}`)
     } catch (err: any) {
       toast.error('Errore nella lettura del file')
     }

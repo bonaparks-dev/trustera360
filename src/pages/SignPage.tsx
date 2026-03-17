@@ -30,6 +30,7 @@ export default function SignPage() {
   const [error, setError] = useState('')
   const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null)
   const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
+  const [requireOtp, setRequireOtp] = useState(true)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Fields
@@ -78,6 +79,7 @@ export default function SignPage() {
       setSignerName(data.signerName)
       setDocumentName(data.documentName)
       setPdfUrl(data.pdfUrl)
+      if (data.requireOtp === false) setRequireOtp(false)
 
       // Set fields and auto-fill values
       if (data.fields && data.fields.length > 0) {
@@ -126,21 +128,30 @@ export default function SignPage() {
     }
   }
 
-  async function handleRequestOtp() {
-    // Validate required fields are filled
+  function validateRequiredFields(): boolean {
     if (hasFields) {
       for (const f of fields) {
         if (!f.required) continue
         const val = fieldValues[f.id]
-        if (f.field_type === 'checkbox') continue // checkbox can be unchecked
-        if (f.field_type === 'label') continue // labels are read-only
-        if (f.field_type === 'signature') continue // filled at sign time
+        if (f.field_type === 'checkbox') continue
+        if (f.field_type === 'label') continue
+        if (f.field_type === 'signature') continue
         if (!val || (typeof val === 'string' && !val.trim())) {
           setError(`Compila il campo "${f.label || FIELD_LABELS[f.field_type]}" prima di procedere`)
-          return
+          return false
         }
       }
     }
+    return true
+  }
+
+  function handleProceedWithoutOtp() {
+    if (!validateRequiredFields()) return
+    setStatus('signing')
+  }
+
+  async function handleRequestOtp() {
+    if (!validateRequiredFields()) return
 
     setStatus('otp_sending')
     setError('')
@@ -421,21 +432,39 @@ export default function SignPage() {
           </div>
         )}
 
-        {/* Step 1: Request OTP */}
+        {/* Step 1: Request OTP or proceed directly */}
         {status === 'viewing' && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
             <h2 className="text-lg font-bold text-gray-800 mb-2">Firma il Documento</h2>
-            <p className="text-gray-600 text-sm mb-6">
-              {hasFields
-                ? 'Compila i campi sopra, poi clicca per ricevere il codice di verifica.'
-                : 'Invieremo un codice di verifica via WhatsApp o email.'}
-            </p>
-            <button
-              onClick={handleRequestOtp}
-              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
-            >
-              Invia Codice di Verifica
-            </button>
+            {requireOtp ? (
+              <>
+                <p className="text-gray-600 text-sm mb-6">
+                  {hasFields
+                    ? 'Compila i campi sopra, poi clicca per ricevere il codice di verifica.'
+                    : 'Invieremo un codice di verifica via WhatsApp o email.'}
+                </p>
+                <button
+                  onClick={handleRequestOtp}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+                >
+                  Invia Codice di Verifica
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-600 text-sm mb-6">
+                  {hasFields
+                    ? 'Compila i campi sopra, poi clicca per procedere alla firma.'
+                    : 'Clicca per procedere alla firma del documento.'}
+                </p>
+                <button
+                  onClick={handleProceedWithoutOtp}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors text-lg"
+                >
+                  Procedi alla Firma
+                </button>
+              </>
+            )}
           </div>
         )}
 

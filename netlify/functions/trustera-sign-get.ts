@@ -80,9 +80,11 @@ export const handler: Handler = async (event) => {
 
       const response: Record<string, any> = {
         signerName: signerRow.signer_name,
+        signerEmail: signerRow.signer_email,
         documentName: doc.name,
         pdfUrl,
         status: signerRow.status,
+        requireOtp: signerRow.require_otp !== false, // default true for backwards compat
         allSigners,
         fields: fieldRows || []
       }
@@ -125,9 +127,11 @@ export const handler: Handler = async (event) => {
 
     const response: Record<string, any> = {
       signerName: doc.signer_name,
+      signerEmail: doc.signer_email,
       documentName: doc.name,
       pdfUrl,
-      status: doc.status
+      status: doc.status,
+      requireOtp: doc.require_otp !== false
     }
 
     if (doc.status === 'signed') {

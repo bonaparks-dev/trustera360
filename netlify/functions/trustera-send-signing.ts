@@ -121,7 +121,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { documentId, signers } = JSON.parse(event.body || '{}')
+    const { documentId, signers, requireOtp = true } = JSON.parse(event.body || '{}')
 
     if (!documentId) {
       return { statusCode: 400, body: JSON.stringify({ error: 'documentId richiesto' }) }
@@ -177,6 +177,7 @@ export const handler: Handler = async (event) => {
           signer_email: signer.email,
           signer_phone: signer.phone || null,
           notification_channel: signer.channel || 'email',
+          require_otp: requireOtp,
           signing_token: token,
           signing_token_expires_at: expiresAt,
           status: 'pending',

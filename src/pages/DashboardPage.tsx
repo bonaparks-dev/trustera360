@@ -555,6 +555,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId: docId,
+          requireOtp: useOtp,
           signers: validSigners.map(s => ({
             name: s.name.trim(),
             email: s.email.trim(),
@@ -715,6 +716,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           documentId: editorDocumentId,
+          requireOtp: useOtp,
           signers: editorSigners.map(s => ({
             name: s.name.trim(),
             email: s.email.trim(),

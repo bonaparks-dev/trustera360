@@ -231,6 +231,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [contacts, setContacts] = useState<Contact[]>([])
   const [contactsLoading, setContactsLoading] = useState(false)
   const [contactSearch, setContactSearch] = useState('')
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set())
 
   const userName = session.user.user_metadata?.full_name || session.user.email || 'Utente'
   const userEmail = session.user.email || ''
@@ -688,10 +689,34 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   const importFileRef = useRef<HTMLInputElement>(null)
 
+  const filteredContacts = contacts.filter(c => {
+    const q = contactSearch.toLowerCase()
+    return !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+  })
+
+  function toggleContactSelection(id: string) {
+    setSelectedContacts(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllContacts() {
+    if (selectedContacts.size === filteredContacts.length) {
+      setSelectedContacts(new Set())
+    } else {
+      setSelectedContacts(new Set(filteredContacts.map(c => c.id)))
+    }
+  }
+
   async function handleExportContacts() {
-    if (contacts.length === 0) { toast.error('Nessun contatto da esportare'); return }
+    const toExport = selectedContacts.size > 0
+      ? contacts.filter(c => selectedContacts.has(c.id))
+      : contacts
+    if (toExport.length === 0) { toast.error('Nessun contatto da esportare'); return }
     const header = 'Nome,Email,Telefono'
-    const rows = contacts.map(c => {
+    const rows = toExport.map(c => {
       const name = c.name.replace(/"/g, '""')
       const email = c.email.replace(/"/g, '""')
       const phone = (c.phone || '').replace(/"/g, '""')
@@ -701,7 +726,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     const csvBytes = new TextEncoder().encode('\uFEFF' + csv)
     const dateSuffix = new Date().toISOString().slice(0, 10)
 
-    if (contacts.length > 500) {
+    if (toExport.length > 500) {
       // ZIP for large exports
       const { default: JSZip } = await import('jszip')
       const zip = new JSZip()
@@ -722,7 +747,8 @@ export default function DashboardPage({ session }: { session: Session }) {
       a.click()
       URL.revokeObjectURL(url)
     }
-    toast.success(`${contacts.length} contatti esportati`)
+    toast.success(`${toExport.length} contatti esportati`)
+    setSelectedContacts(new Set())
   }
 
   async function handleImportContacts(e: React.ChangeEvent<HTMLInputElement>) {
@@ -845,11 +871,6 @@ export default function DashboardPage({ session }: { session: Session }) {
     name_asc: 'Nome (A-Z)',
     name_desc: 'Nome (Z-A)',
   }
-
-  const filteredContacts = contacts.filter(c => {
-    const q = contactSearch.toLowerCase()
-    return !q || c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
-  })
 
   // ── Sidebar nav items ─────────────────────────────────────────────────────
 
@@ -1244,7 +1265,10 @@ export default function DashboardPage({ session }: { session: Session }) {
               <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
                 <div>
                   <h2 className="text-lg font-bold text-gray-800">Contatti</h2>
-                  <span className="text-sm text-gray-400">{contacts.length} totali</span>
+                  <span className="text-sm text-gray-400">
+                    {contacts.length} totali
+                    {selectedContacts.size > 0 && ` · ${selectedContacts.size} selezionati`}
+                  </span>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1270,7 +1294,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
-                    Esporta
+                    {selectedContacts.size > 0 ? `Esporta (${selectedContacts.size})` : 'Esporta'}
                   </button>
                 </div>
               </div>
@@ -1297,13 +1321,41 @@ export default function DashboardPage({ session }: { session: Session }) {
                 </div>
               ) : (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  {/* Select All header */}
+                  <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+                    <input
+                      type="checkbox"
+                      checked={filteredContacts.length > 0 && selectedContacts.size === filteredContacts.length}
+                      onChange={toggleSelectAllContacts}
+                      className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      {selectedContacts.size === filteredContacts.length && filteredContacts.length > 0
+                        ? 'Deseleziona tutti'
+                        : 'Seleziona tutti'}
+                    </span>
+                    {selectedContacts.size > 0 && (
+                      <button
+                        onClick={() => setSelectedContacts(new Set())}
+                        className="ml-auto text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        Annulla selezione
+                      </button>
+                    )}
+                  </div>
                   {filteredContacts.map((contact, i) => (
                     <div
                       key={contact.id}
-                      className={`flex items-center justify-between px-5 py-4 gap-3 ${
+                      className={`flex items-center gap-3 px-5 py-4 ${
                         i < filteredContacts.length - 1 ? 'border-b border-gray-100' : ''
-                      }`}
+                      } ${selectedContacts.has(contact.id) ? 'bg-green-50/40' : ''}`}
                     >
+                      <input
+                        type="checkbox"
+                        checked={selectedContacts.has(contact.id)}
+                        onChange={() => toggleContactSelection(contact.id)}
+                        className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer flex-shrink-0"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-800 text-sm">{contact.name}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{contact.email}</p>

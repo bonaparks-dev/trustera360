@@ -211,6 +211,8 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [docFilter, setDocFilter] = useState<DocFilter>('tutte')
   const [docSort, setDocSort] = useState<SortOption>('created_desc')
   const [docSearch, setDocSearch] = useState('')
+  const [editingScheduleDocId, setEditingScheduleDocId] = useState<string | null>(null)
+  const [editingScheduleValue, setEditingScheduleValue] = useState('')
   const [showSortMenu, setShowSortMenu] = useState(false)
 
   // Upload modal
@@ -753,6 +755,22 @@ export default function DashboardPage({ session }: { session: Session }) {
       toast.error('Errore nello spostamento nel cestino')
     } else {
       toast.success('Documento spostato nel cestino')
+      loadDocuments()
+    }
+  }
+
+  async function handleUpdateSchedule(docId: string, newDateTime: string) {
+    const scheduled = new Date(newDateTime)
+    if (scheduled <= new Date()) { toast.error('La data deve essere nel futuro'); return }
+    const { error } = await supabase
+      .from('trustera_documents')
+      .update({ scheduled_at: scheduled.toISOString() })
+      .eq('id', docId)
+    if (error) {
+      toast.error('Errore nell\'aggiornamento')
+    } else {
+      toast.success('Orario aggiornato')
+      setEditingScheduleDocId(null)
       loadDocuments()
     }
   }
@@ -1312,13 +1330,50 @@ export default function DashboardPage({ session }: { session: Session }) {
                           <div className="border-t border-gray-100 bg-gray-50/80 px-5 py-3 space-y-2">
                             {/* Scheduled info */}
                             {doc.status === 'scheduled' && doc.scheduled_at && (
-                              <div className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2 mb-2">
-                                <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                </svg>
-                                <span className="text-sm text-blue-700 font-medium">
-                                  Invio programmato: {formatDateIT(doc.scheduled_at)}
-                                </span>
+                              <div className="bg-blue-50 rounded-lg px-3 py-2 mb-2 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                  </svg>
+                                  <span className="text-sm text-blue-700 font-medium flex-1">
+                                    Invio programmato: {formatDateIT(doc.scheduled_at)}
+                                  </span>
+                                  <button
+                                    onClick={e => {
+                                      e.stopPropagation()
+                                      if (editingScheduleDocId === doc.id) {
+                                        setEditingScheduleDocId(null)
+                                      } else {
+                                        setEditingScheduleDocId(doc.id)
+                                        // Pre-fill with current scheduled time in local format
+                                        const d = new Date(doc.scheduled_at!)
+                                        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+                                        setEditingScheduleValue(local)
+                                      }
+                                    }}
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                                  >
+                                    {editingScheduleDocId === doc.id ? 'Annulla' : 'Modifica'}
+                                  </button>
+                                </div>
+                                {editingScheduleDocId === doc.id && (
+                                  <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                                    <input
+                                      type="datetime-local"
+                                      value={editingScheduleValue}
+                                      onChange={e => setEditingScheduleValue(e.target.value)}
+                                      min={new Date().toISOString().slice(0, 16)}
+                                      className="flex-1 border border-blue-200 rounded-lg px-3 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-blue-500"
+                                    />
+                                    <button
+                                      onClick={() => handleUpdateSchedule(doc.id, editingScheduleValue)}
+                                      disabled={!editingScheduleValue}
+                                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                      Salva
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             )}
 

@@ -28,6 +28,7 @@ interface Document {
   signer_email?: string
   signer_name?: string
   pdf_url?: string
+  raw_pdf_url?: string
   signed_pdf_url?: string
   signed_at?: string
   owner_id?: string
@@ -269,6 +270,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     return Promise.all(docs.map(async (doc) => ({
       ...doc,
       signers: mapSigners(doc.signers),
+      raw_pdf_url: doc.pdf_url || undefined,
       pdf_url: (await getSignedUrl(doc.pdf_url ?? null)) ?? undefined,
       signed_pdf_url: (await getSignedUrl(doc.signed_pdf_url ?? null)) ?? undefined,
     })))
@@ -370,7 +372,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   function handleOpenDraft(doc: Document) {
     resetUploadModal()
     setEditingDraftId(doc.id)
-    setEditingDraftPdfUrl(doc.pdf_url || null)
+    setEditingDraftPdfUrl(doc.raw_pdf_url || doc.pdf_url || null)
     // Restore signers from draft_signers
     if (doc.draft_signers && doc.draft_signers.length > 0) {
       const rows: SignerRow[] = doc.draft_signers.map(s => ({

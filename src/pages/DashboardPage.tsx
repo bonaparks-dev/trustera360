@@ -932,13 +932,14 @@ export default function DashboardPage({ session }: { session: Session }) {
 
       if (imported.length === 0) { toast.error('Nessun contatto valido trovato nel file. Verifica che il CSV abbia colonne: Nome, Email, Telefono'); return }
 
-      // Filter: DB requires email for unique constraint
+      // Split: contacts with email can be upserted, without email must be inserted
       const withEmail = imported.filter(c => c.email)
-      if (withEmail.length === 0) { toast.error('Nessun contatto con email trovato'); return }
+      const withoutEmail = imported.filter(c => !c.email)
 
-      // Upsert in batches of 50
       let successCount = 0
       let errorCount = 0
+
+      // Upsert contacts with email in batches of 50
       for (let b = 0; b < withEmail.length; b += 50) {
         const batch = withEmail.slice(b, b + 50).map(c => ({
           owner_id: session.user.id,
@@ -958,11 +959,31 @@ export default function DashboardPage({ session }: { session: Session }) {
         }
       }
 
+      // Insert contacts without email (no upsert possible)
+      for (let b = 0; b < withoutEmail.length; b += 50) {
+        const batch = withoutEmail.slice(b, b + 50).map(c => ({
+          owner_id: session.user.id,
+          name: c.name,
+          email: c.phone || c.name, // use phone or name as placeholder
+          phone: c.phone || null,
+          updated_at: new Date().toISOString(),
+        }))
+        const { error } = await supabase
+          .from('trustera_contacts')
+          .insert(batch)
+        if (error) {
+          console.error('Import no-email batch error:', error.message)
+          errorCount += batch.length
+        } else {
+          successCount += batch.length
+        }
+      }
+
       if (successCount > 0) {
         toast.success(`${successCount} contatti importati${errorCount > 0 ? ` (${errorCount} errori)` : ''}`)
         loadContacts()
       } else {
-        toast.error(`Importazione fallita: verifica il formato del file`)
+        toast.error('Importazione fallita: verifica il formato del file')
       }
     } catch (err: any) {
       toast.error('Errore nella lettura del file')

@@ -565,7 +565,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   const importFileRef = useRef<HTMLInputElement>(null)
 
-  function handleExportContacts() {
+  async function handleExportContacts() {
     if (contacts.length === 0) { toast.error('Nessun contatto da esportare'); return }
     const header = 'Nome,Email,Telefono'
     const rows = contacts.map(c => {
@@ -575,13 +575,30 @@ export default function DashboardPage({ session }: { session: Session }) {
       return `"${name}","${email}","${phone}"`
     })
     const csv = [header, ...rows].join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `contatti_trustera_${new Date().toISOString().slice(0, 10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    const csvBytes = new TextEncoder().encode('\uFEFF' + csv)
+    const dateSuffix = new Date().toISOString().slice(0, 10)
+
+    if (contacts.length > 500) {
+      // ZIP for large exports
+      const { default: JSZip } = await import('jszip')
+      const zip = new JSZip()
+      zip.file(`contatti_trustera_${dateSuffix}.csv`, csvBytes)
+      const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contatti_trustera_${dateSuffix}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } else {
+      const blob = new Blob([csvBytes], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `contatti_trustera_${dateSuffix}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
     toast.success(`${contacts.length} contatti esportati`)
   }
 

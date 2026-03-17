@@ -22,7 +22,7 @@ interface Signer {
 interface Document {
   id: string
   name: string
-  status: 'draft' | 'scheduled' | 'pending' | 'signed'
+  status: 'draft' | 'scheduled' | 'pending' | 'signed' | 'deleted'
   created_at: string
   // legacy single-signer fields
   signer_email?: string
@@ -55,7 +55,7 @@ interface SignerRow {
 
 type SidebarSection = 'documenti' | 'contatti'
 type DocTab = 'sent' | 'signed_by_me'
-type DocFilter = 'tutte' | 'in_corso' | 'completate' | 'bozza'
+type DocFilter = 'tutte' | 'in_corso' | 'completate' | 'bozza' | 'cestino'
 type SortOption = 'created_desc' | 'created_asc' | 'signed_desc' | 'signed_asc' | 'name_asc' | 'name_desc'
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -175,6 +175,7 @@ const statusColors: Record<string, string> = {
   scheduled: 'bg-blue-500',
   pending: 'bg-yellow-500',
   signed: 'bg-green-600',
+  deleted: 'bg-red-400',
 }
 
 const statusLabels: Record<string, string> = {
@@ -182,6 +183,7 @@ const statusLabels: Record<string, string> = {
   scheduled: 'Programmato',
   pending: 'In attesa',
   signed: 'Firmato',
+  deleted: 'Cestino',
 }
 
 function formatDateIT(iso: string) {
@@ -640,6 +642,48 @@ export default function DashboardPage({ session }: { session: Session }) {
     }
   }
 
+  // ── Document trash / restore ─────────────────────────────────────────────
+
+  async function handleTrashDocument(docId: string) {
+    const { error } = await supabase
+      .from('trustera_documents')
+      .update({ status: 'deleted' })
+      .eq('id', docId)
+    if (error) {
+      toast.error('Errore nello spostamento nel cestino')
+    } else {
+      toast.success('Documento spostato nel cestino')
+      loadDocuments()
+    }
+  }
+
+  async function handleRestoreDocument(docId: string) {
+    const { error } = await supabase
+      .from('trustera_documents')
+      .update({ status: 'draft' })
+      .eq('id', docId)
+    if (error) {
+      toast.error('Errore nel ripristino')
+    } else {
+      toast.success('Documento ripristinato')
+      loadDocuments()
+    }
+  }
+
+  async function handleDeleteDocumentPermanently(docId: string) {
+    if (!confirm('Eliminare definitivamente questo documento? Questa azione non può essere annullata.')) return
+    const { error } = await supabase
+      .from('trustera_documents')
+      .delete()
+      .eq('id', docId)
+    if (error) {
+      toast.error('Errore nell\'eliminazione')
+    } else {
+      toast.success('Documento eliminato definitivamente')
+      loadDocuments()
+    }
+  }
+
   // ── Contacts ──────────────────────────────────────────────────────────────
 
   const importFileRef = useRef<HTMLInputElement>(null)
@@ -755,6 +799,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   const totalSent = sentDocuments.length
   const draftCount = sentDocuments.filter(d => d.status === 'draft' || d.status === 'scheduled').length
+  const deletedCount = sentDocuments.filter(d => d.status === 'deleted').length
   const pendingCount = sentDocuments.filter(d => d.status === 'pending').length
   const signedSentCount = sentDocuments.filter(d => d.status === 'signed').length
   const signedByMeCount = signedByMeDocuments.length
@@ -763,9 +808,11 @@ export default function DashboardPage({ session }: { session: Session }) {
   const baseDocuments = activeDocTab === 'sent' ? sentDocuments : signedByMeDocuments
   const filteredDocuments = baseDocuments.filter(doc => {
     // Status filter
+    if (docFilter === 'tutte' && doc.status === 'deleted') return false
     if (docFilter === 'in_corso' && doc.status !== 'pending') return false
     if (docFilter === 'completate' && doc.status !== 'signed') return false
     if (docFilter === 'bozza' && doc.status !== 'draft' && doc.status !== 'scheduled') return false
+    if (docFilter === 'cestino' && doc.status !== 'deleted') return false
     // Search
     if (docSearch) {
       const q = docSearch.toLowerCase()
@@ -930,6 +977,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     { key: 'in_corso' as DocFilter, label: 'In corso', count: pendingCount },
                     { key: 'completate' as DocFilter, label: 'Completate', count: signedSentCount },
                     { key: 'bozza' as DocFilter, label: 'Bozza', count: draftCount },
+                    { key: 'cestino' as DocFilter, label: 'Cestino', count: deletedCount },
                   ]).map(tab => (
                     <button
                       key={tab.key}
@@ -1095,6 +1143,34 @@ export default function DashboardPage({ session }: { session: Session }) {
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
                                 </svg>
                               </a>
+                            )}
+                            {doc.status === 'deleted' ? (
+                              <>
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleRestoreDocument(doc.id) }}
+                                  className="p-1.5 rounded-lg hover:bg-green-50 text-gray-400 hover:text-green-600 transition-colors"
+                                  title="Ripristina"
+                                >
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); handleDeleteDocumentPermanently(doc.id) }}
+                                  className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                  title="Elimina definitivamente"
+                                >
+                                  <IconTrash className="w-4 h-4" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleTrashDocument(doc.id) }}
+                                className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                                title="Sposta nel cestino"
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </button>
                             )}
                             <IconChevron open={isExpanded} />
                           </div>

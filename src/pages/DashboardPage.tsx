@@ -1012,21 +1012,39 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function handleRemoveDuplicates() {
     if (contacts.length === 0) return
-    // Group by name+email (lowercase) — keep the newest (last created_at)
-    const groups = new Map<string, typeof contacts>()
+
+    const normalizePhone = (p: string) => p.replace(/[\s\-\(\)\+]/g, '')
+    const isPlaceholderEmail = (e: string) => e.includes('@noemail') || /^\+?\d[\d\s\-]+$/.test(e)
+
+    // Pass 1: Group by name+email (real emails only)
+    const byEmail = new Map<string, typeof contacts>()
+    // Pass 2: Group by name+phone (for contacts without real email)
+    const byPhone = new Map<string, typeof contacts>()
+    const alreadyMarked = new Set<string>()
+
     for (const c of contacts) {
-      const key = `${c.name.trim().toLowerCase()}|${c.email.trim().toLowerCase()}`
-      const group = groups.get(key) || []
-      group.push(c)
-      groups.set(key, group)
+      if (c.email && !isPlaceholderEmail(c.email)) {
+        const key = `${c.name.trim().toLowerCase()}|${c.email.trim().toLowerCase()}`
+        const group = byEmail.get(key) || []
+        group.push(c)
+        byEmail.set(key, group)
+      } else if (c.phone) {
+        const key = `${c.name.trim().toLowerCase()}|${normalizePhone(c.phone)}`
+        const group = byPhone.get(key) || []
+        group.push(c)
+        byPhone.set(key, group)
+      }
     }
+
     const toDelete: string[] = []
-    for (const group of groups.values()) {
+    for (const group of [...byEmail.values(), ...byPhone.values()]) {
       if (group.length <= 1) continue
-      // Sort by created_at desc, keep first (newest), delete rest
       group.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       for (let i = 1; i < group.length; i++) {
-        toDelete.push(group[i].id)
+        if (!alreadyMarked.has(group[i].id)) {
+          toDelete.push(group[i].id)
+          alreadyMarked.add(group[i].id)
+        }
       }
     }
     if (toDelete.length === 0) { toast.success('Nessun duplicato trovato'); return }

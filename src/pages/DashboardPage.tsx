@@ -924,8 +924,8 @@ export default function DashboardPage({ session }: { session: Session }) {
         const name = (nameCol >= 0 ? cols[nameCol] : '').trim()
         const email = (emailCol >= 0 ? cols[emailCol] : '').trim()
         const phone = (phoneCol >= 0 ? cols[phoneCol] : '').trim()
-        // Accept if we have at least a name and (email OR phone)
-        if (name && (email.includes('@') || phone)) {
+        // Accept if we have at least a name
+        if (name) {
           imported.push({ name, email: email.includes('@') ? email : '', phone })
         }
       }
@@ -964,7 +964,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         const batch = withoutEmail.slice(b, b + 50).map(c => ({
           owner_id: session.user.id,
           name: c.name,
-          email: c.phone || c.name, // use phone or name as placeholder
+          email: c.phone || `${c.name.toLowerCase().replace(/\s+/g, '.')}@noemail`, // placeholder
           phone: c.phone || null,
           updated_at: new Date().toISOString(),
         }))

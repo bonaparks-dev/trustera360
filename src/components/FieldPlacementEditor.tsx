@@ -58,10 +58,18 @@ function FieldIcon({ type, className }: { type: FieldType; className?: string })
       return <svg className={cls} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     case 'radio':
       return <svg className={cls} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" fill="currentColor" /></svg>
+    case 'initials':
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" strokeWidth={1.5} stroke="currentColor"><text x="3" y="18" fontSize="14" fontWeight="bold" fontStyle="italic" fill="currentColor" stroke="none">A.B.</text></svg>
+    case 'readonly':
+      return <svg className={cls} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.2 48.2 0 0 0 5.166-.479c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
   }
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
+
+// Field types split into categories
+const GLOBAL_FIELD_TYPES: FieldType[] = ['readonly', 'initials']
+const SIGNER_FIELD_TYPES: FieldType[] = ['signature', 'date', 'name', 'email', 'text', 'label', 'checkbox', 'radio']
 
 export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCancel }: FieldPlacementEditorProps) {
   const [numPages, setNumPages] = useState(0)
@@ -73,7 +81,13 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   const [tapPlaceType, setTapPlaceType] = useState<FieldType | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
+  const [expandedSignerIndex, setExpandedSignerIndex] = useState<number | null>(0)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
+
+  function toggleSection(key: string) {
+    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
 
   // Fetch PDF as blob to avoid CORS issues with Supabase storage
   useEffect(() => {
@@ -286,8 +300,6 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const fieldTypes = Object.entries(FIELD_TYPES) as [FieldType, typeof FIELD_TYPES[FieldType]][]
-
   return (
     <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col">
 
@@ -305,65 +317,121 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
         </button>
       </div>
 
-      {/* ── Signer selector bar ─────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-100 px-4 py-2.5 flex gap-2 overflow-x-auto flex-shrink-0">
-        {signers.map((signer, i) => {
-          const color = SIGNER_COLORS[i % SIGNER_COLORS.length]
-          const count = fields.filter(f => f.signerIndex === i).length
-          return (
-            <button
-              key={i}
-              onClick={() => setActiveSignerIndex(i)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
-                activeSignerIndex === i
-                  ? `${color.bg} ${color.text} ring-2 ring-offset-1`
-                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-              }`}
-              style={activeSignerIndex === i ? { '--tw-ring-color': color.hex } as any : undefined}
-            >
-              <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: color.hex }}>
-                {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-              </span>
-              {signer.name}
-              {count > 0 && (
-                <span className={`${color.bg} ${color.text} text-xs font-bold px-1.5 py-0.5 rounded-full`}>{count}</span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
       <div className="flex flex-1 overflow-hidden">
 
-        {/* ── Desktop sidebar (field palette) ──────────────────────────────── */}
-        <aside className="hidden md:flex flex-col w-56 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
-          <div className="p-3">
-            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Campi</p>
-            <div className="space-y-1">
-              {fieldTypes.map(([type, config]) => (
-                <div
-                  key={type}
-                  draggable
-                  onDragStart={e => handlePaletteDragStart(e, type)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-colors border border-transparent hover:border-blue-200"
-                >
-                  <div className="flex items-center gap-1.5 text-gray-400">
-                    <svg className="w-3 h-3" viewBox="0 0 12 12" fill="currentColor">
+        {/* ── Desktop sidebar (YouSign-style) ──────────────────────────────── */}
+        <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 flex-shrink-0 overflow-y-auto">
+
+          {/* ── Campi (global fields) ── */}
+          <div className="border-b border-gray-100">
+            <button
+              onClick={() => toggleSection('campi')}
+              className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800 flex-1 text-left">Campi</span>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsedSections['campi'] ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {!collapsedSections['campi'] && (
+              <div className="px-3 pb-3 space-y-1">
+                {GLOBAL_FIELD_TYPES.map(type => (
+                  <div
+                    key={type}
+                    draggable
+                    onDragStart={e => handlePaletteDragStart(e, type)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50/50 hover:bg-blue-100/60 cursor-grab active:cursor-grabbing transition-colors"
+                  >
+                    <svg className="w-3 h-3 text-gray-300" viewBox="0 0 12 12" fill="currentColor">
                       <circle cx="3" cy="3" r="1.2" /><circle cx="3" cy="9" r="1.2" />
                       <circle cx="9" cy="3" r="1.2" /><circle cx="9" cy="9" r="1.2" />
                     </svg>
+                    <FieldIcon type={type} className="w-5 h-5 text-gray-500" />
+                    <span className="text-sm text-gray-700 font-medium">{FIELD_TYPES[type].label}</span>
                   </div>
-                  <FieldIcon type={type} className="w-5 h-5 text-gray-500" />
-                  <span className="text-sm text-gray-700 font-medium">{config.label}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ── Firmatari ── */}
+          <div className="border-b border-gray-100">
+            <button
+              onClick={() => toggleSection('firmatari')}
+              className="w-full flex items-center gap-2.5 px-4 py-3 hover:bg-gray-50 transition-colors"
+            >
+              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800 flex-1 text-left">Firmatari</span>
+              <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{signers.length}</span>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${collapsedSections['firmatari'] ? '' : 'rotate-180'}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+              </svg>
+            </button>
+            {!collapsedSections['firmatari'] && (
+              <div className="pb-2">
+                {signers.map((signer, i) => {
+                  const color = SIGNER_COLORS[i % SIGNER_COLORS.length]
+                  const count = fields.filter(f => f.signerIndex === i).length
+                  const isExpanded = expandedSignerIndex === i
+                  const initials = signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+
+                  return (
+                    <div key={i}>
+                      {/* Signer header */}
+                      <button
+                        onClick={() => { setActiveSignerIndex(i); setExpandedSignerIndex(isExpanded ? null : i) }}
+                        className={`w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-gray-50 transition-colors ${
+                          activeSignerIndex === i ? 'bg-gray-50' : ''
+                        }`}
+                      >
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0" style={{ backgroundColor: color.hex }}>
+                          {initials}
+                        </span>
+                        <span className="text-sm font-medium text-gray-800 flex-1 text-left uppercase truncate">{signer.name}</span>
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: color.hex + '20', color: color.hex }}>
+                          {count}
+                        </span>
+                        <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Signer's field palette */}
+                      {isExpanded && (
+                        <div className="px-3 pb-2 space-y-1">
+                          {SIGNER_FIELD_TYPES.map(type => (
+                            <div
+                              key={type}
+                              draggable
+                              onDragStart={e => { setActiveSignerIndex(i); handlePaletteDragStart(e, type) }}
+                              className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-blue-50/50 hover:bg-blue-100/60 cursor-grab active:cursor-grabbing transition-colors"
+                            >
+                              <svg className="w-3 h-3 text-gray-300" viewBox="0 0 12 12" fill="currentColor">
+                                <circle cx="3" cy="3" r="1.2" /><circle cx="3" cy="9" r="1.2" />
+                                <circle cx="9" cy="3" r="1.2" /><circle cx="9" cy="9" r="1.2" />
+                              </svg>
+                              <FieldIcon type={type} className="w-5 h-5 text-gray-500" />
+                              <span className="text-sm text-gray-700 font-medium">{FIELD_TYPES[type].label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Instructions */}
           <div className="mt-auto p-4 border-t border-gray-100">
             <p className="text-xs text-gray-400 leading-relaxed">
-              Trascina i campi sul documento per posizionarli. Seleziona il firmatario in alto per assegnare i campi.
+              Trascina i campi sul documento per posizionarli. Espandi un firmatario per assegnare i campi.
             </p>
           </div>
         </aside>
@@ -486,17 +554,37 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
 
         {/* Mobile palette sheet */}
         {showMobilePalette && !tapPlaceType && (
-          <div className="bg-white border-t border-gray-200 px-4 pb-6 pt-2 grid grid-cols-2 gap-2 max-h-[40vh] overflow-y-auto">
-            {fieldTypes.map(([type, config]) => (
-              <button
-                key={type}
-                onClick={() => { setTapPlaceType(type); setShowMobilePalette(false) }}
-                className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors border border-gray-100 text-left"
-              >
-                <FieldIcon type={type} className="w-5 h-5 text-gray-500 flex-shrink-0" />
-                <span className="text-sm text-gray-700 font-medium">{config.label}</span>
-              </button>
-            ))}
+          <div className="bg-white border-t border-gray-200 px-4 pb-6 pt-2 max-h-[50vh] overflow-y-auto">
+            {/* Signer selector */}
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-2 border-b border-gray-100">
+              {signers.map((signer, i) => {
+                const color = SIGNER_COLORS[i % SIGNER_COLORS.length]
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setActiveSignerIndex(i)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
+                      activeSignerIndex === i ? 'text-white' : 'bg-gray-100 text-gray-500'
+                    }`}
+                    style={activeSignerIndex === i ? { backgroundColor: color.hex } : undefined}
+                  >
+                    {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {[...GLOBAL_FIELD_TYPES, ...SIGNER_FIELD_TYPES].map(type => (
+                <button
+                  key={type}
+                  onClick={() => { setTapPlaceType(type); setShowMobilePalette(false) }}
+                  className="flex items-center gap-2.5 px-3 py-3 rounded-xl bg-gray-50 hover:bg-blue-50 transition-colors border border-gray-100 text-left"
+                >
+                  <FieldIcon type={type} className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 font-medium">{FIELD_TYPES[type].label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>

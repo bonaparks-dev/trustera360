@@ -1,4 +1,4 @@
-export type FieldType = 'signature' | 'date' | 'name' | 'email' | 'text' | 'label' | 'checkbox' | 'radio'
+export type FieldType = 'signature' | 'date' | 'name' | 'email' | 'text' | 'label' | 'checkbox' | 'radio' | 'initials' | 'readonly'
 
 export interface DocumentField {
   id: string
@@ -35,6 +35,8 @@ export const FIELD_TYPES: Record<FieldType, FieldTypeConfig> = {
   label:      { label: 'Dicitura',              defaultWidth: 15, defaultHeight: 4 },
   checkbox:   { label: 'Casella da spuntare',   defaultWidth: 4,  defaultHeight: 4 },
   radio:      { label: 'Pulsante di opzione',   defaultWidth: 4,  defaultHeight: 4 },
+  initials:   { label: 'Iniziali',              defaultWidth: 10, defaultHeight: 5 },
+  readonly:   { label: 'Testo sola lettura',    defaultWidth: 20, defaultHeight: 4 },
 }
 
 // Colors assigned to signers (up to 8)

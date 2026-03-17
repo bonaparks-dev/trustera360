@@ -16,6 +16,8 @@ const FIELD_LABELS: Record<FieldType, string> = {
   label: 'Dicitura',
   checkbox: '',
   radio: '',
+  initials: 'Iniziali',
+  readonly: 'Testo sola lettura',
 }
 
 export default function SignPage() {

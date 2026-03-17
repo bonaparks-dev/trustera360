@@ -932,25 +932,37 @@ export default function DashboardPage({ session }: { session: Session }) {
 
       if (imported.length === 0) { toast.error('Nessun contatto valido trovato nel file. Verifica che il CSV abbia colonne: Nome, Email, Telefono'); return }
 
-      // Upsert each contact
-      const rows = imported.map(c => ({
-        owner_id: session.user.id,
-        name: c.name,
-        email: c.email,
-        phone: c.phone || null,
-        updated_at: new Date().toISOString(),
-      }))
+      // Filter: DB requires email for unique constraint
+      const withEmail = imported.filter(c => c.email)
+      if (withEmail.length === 0) { toast.error('Nessun contatto con email trovato'); return }
 
-      const { error } = await supabase
-        .from('trustera_contacts')
-        .upsert(rows, { onConflict: 'owner_id,email' })
+      // Upsert in batches of 50
+      let successCount = 0
+      let errorCount = 0
+      for (let b = 0; b < withEmail.length; b += 50) {
+        const batch = withEmail.slice(b, b + 50).map(c => ({
+          owner_id: session.user.id,
+          name: c.name,
+          email: c.email,
+          phone: c.phone || null,
+          updated_at: new Date().toISOString(),
+        }))
+        const { error } = await supabase
+          .from('trustera_contacts')
+          .upsert(batch, { onConflict: 'owner_id,email' })
+        if (error) {
+          console.error('Import batch error:', error.message)
+          errorCount += batch.length
+        } else {
+          successCount += batch.length
+        }
+      }
 
-      if (error) {
-        console.error('Import error:', error)
-        toast.error('Errore durante l\'importazione')
-      } else {
-        toast.success(`${imported.length} contatti importati`)
+      if (successCount > 0) {
+        toast.success(`${successCount} contatti importati${errorCount > 0 ? ` (${errorCount} errori)` : ''}`)
         loadContacts()
+      } else {
+        toast.error(`Importazione fallita: verifica il formato del file`)
       }
     } catch (err: any) {
       toast.error('Errore nella lettura del file')

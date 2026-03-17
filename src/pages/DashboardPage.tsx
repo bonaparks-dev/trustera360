@@ -1780,7 +1780,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   </div>
                   {useOtp && (
                     <p className="text-[12px] text-gray-400 mt-2">
-                      Il firmatario riceverà un codice OTP via email per verificare la sua identità prima di firmare.
+                      Il firmatario riceverà un codice OTP per verificare la sua identità prima di firmare.
                     </p>
                   )}
                 </div>

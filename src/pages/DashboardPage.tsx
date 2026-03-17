@@ -156,11 +156,8 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   useEffect(() => {
     loadDocuments()
+    loadContacts()
   }, [])
-
-  useEffect(() => {
-    if (section === 'contatti') loadContacts()
-  }, [section])
 
   async function getSignedUrl(url: string | null) {
     if (!url) return url
@@ -543,7 +540,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         {navItems.map(({ key, label, Icon }) => (
           <button
             key={key}
-            onClick={() => setSection(key)}
+            onClick={() => { setSection(key); if (key === 'contatti') loadContacts() }}
             className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               section === key
                 ? 'border-green-600 text-green-700'
@@ -565,7 +562,7 @@ export default function DashboardPage({ session }: { session: Session }) {
             {navItems.map(({ key, label, Icon }) => (
               <button
                 key={key}
-                onClick={() => setSection(key)}
+                onClick={() => { setSection(key); if (key === 'contatti') loadContacts() }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
                   section === key
                     ? 'bg-green-50 text-green-700'

@@ -348,6 +348,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   // ── Modal state ──
   const [signerCount, setSignerCount] = useState(0) // 0 = not yet chosen
   const [focusedSignerField, setFocusedSignerField] = useState<{ index: number; field: 'email' | 'name' } | null>(null)
+  const [useOtp, setUseOtp] = useState(false)
 
   function resetUploadModal() {
     setSelectedFile(null)
@@ -356,15 +357,24 @@ export default function DashboardPage({ session }: { session: Session }) {
     setFocusedSignerField(null)
     setShowSchedulePicker(false)
     setScheduledDateTime('')
+    setUseOtp(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function handleSelectSignerCount(count: number) {
+    if (count < 1) count = 1
+    if (count > 10) count = 10
     setSignerCount(count)
-    const rows: SignerRow[] = Array.from({ length: count }, () => ({
-      name: '', email: '', phone: '', countryCode: '+39', channel: 'email'
-    }))
-    setSignerRows(rows)
+    setSignerRows(prev => {
+      if (count > prev.length) {
+        // Add new empty rows
+        return [...prev, ...Array.from({ length: count - prev.length }, () => ({
+          name: '', email: '', phone: '', countryCode: '+39', channel: 'email' as const
+        }))]
+      }
+      // Trim extra rows
+      return prev.slice(0, count)
+    })
   }
 
   function updateSignerRow(index: number, field: keyof SignerRow, value: string) {
@@ -1439,31 +1449,31 @@ export default function DashboardPage({ session }: { session: Session }) {
                 <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-3">Firmatari</label>
 
                 {/* Step 1: Select number of signers */}
-                {signerCount === 0 ? (
-                  <div>
-                    <p className="text-sm text-gray-600 mb-3">Quanti firmatari?</p>
-                    <div className="flex gap-2">
-                      {[1, 2, 3, 4, 5].map(n => (
-                        <button
-                          key={n}
-                          type="button"
-                          onClick={() => handleSelectSignerCount(n)}
-                          className="flex-1 py-3 rounded-xl text-sm font-semibold bg-gray-50 hover:bg-green-50 hover:text-green-700 border border-gray-200 hover:border-green-300 text-gray-700 transition-all"
-                        >
-                          {n}
-                        </button>
-                      ))}
-                    </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-3">Quanti firmatari?</p>
+                  <div className="flex items-center justify-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSignerCount(signerCount - 1)}
+                      disabled={signerCount <= 1}
+                      className="w-11 h-11 rounded-full border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xl font-medium text-gray-600 transition-all"
+                    >
+                      &minus;
+                    </button>
+                    <span className="text-2xl font-bold text-gray-800 w-8 text-center tabular-nums">{signerCount || 1}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSignerCount((signerCount || 0) + 1)}
+                      disabled={signerCount >= 10}
+                      className="w-11 h-11 rounded-full border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xl font-medium text-gray-600 transition-all"
+                    >
+                      +
+                    </button>
                   </div>
-                ) : (
+                </div>
+
+                {signerCount > 0 && (
                   <div className="space-y-4">
-                    {/* Change count */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">{signerCount} firmatari{signerCount > 1 ? 'o' : ''}</span>
-                      <button type="button" onClick={() => { setSignerCount(0); setSignerRows([]) }} className="text-xs text-gray-400 hover:text-gray-600">
-                        Cambia
-                      </button>
-                    </div>
 
                     {/* Step 2+3: For each signer — channel, then email (with autocomplete), name, phone */}
                     {signerRows.map((signer, i) => (
@@ -1562,6 +1572,48 @@ export default function DashboardPage({ session }: { session: Session }) {
                   </div>
                 )}
               </div>
+
+              {/* OTP toggle */}
+              {signerCount > 0 && (
+                <div className="mt-4 border border-gray-200 rounded-xl p-4">
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3">Verifica identità</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setUseOtp(false)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-all ${
+                        !useOtp
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                      </svg>
+                      Senza OTP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseOtp(true)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium border transition-all ${
+                        useOtp
+                          ? 'border-green-500 bg-green-50 text-green-700'
+                          : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
+                      </svg>
+                      Con OTP
+                    </button>
+                  </div>
+                  {useOtp && (
+                    <p className="text-[12px] text-gray-400 mt-2">
+                      Il firmatario riceverà un codice OTP via email per verificare la sua identità prima di firmare.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Submit buttons */}
               {signerCount > 0 && (

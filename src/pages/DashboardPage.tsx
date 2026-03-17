@@ -49,6 +49,7 @@ interface SignerRow {
   name: string
   email: string
   phone: string
+  countryCode: string
   channel: 'email' | 'whatsapp'
 }
 
@@ -91,6 +92,82 @@ function IconTrash({ className }: { className?: string }) {
   )
 }
 
+// ─── Country codes ───────────────────────────────────────────────────────────
+
+const COUNTRY_CODES = [
+  { code: '+39', flag: '🇮🇹', name: 'Italia' },
+  { code: '+33', flag: '🇫🇷', name: 'Francia' },
+  { code: '+49', flag: '🇩🇪', name: 'Germania' },
+  { code: '+44', flag: '🇬🇧', name: 'Regno Unito' },
+  { code: '+34', flag: '🇪🇸', name: 'Spagna' },
+  { code: '+351', flag: '🇵🇹', name: 'Portogallo' },
+  { code: '+41', flag: '🇨🇭', name: 'Svizzera' },
+  { code: '+43', flag: '🇦🇹', name: 'Austria' },
+  { code: '+32', flag: '🇧🇪', name: 'Belgio' },
+  { code: '+31', flag: '🇳🇱', name: 'Paesi Bassi' },
+  { code: '+46', flag: '🇸🇪', name: 'Svezia' },
+  { code: '+47', flag: '🇳🇴', name: 'Norvegia' },
+  { code: '+45', flag: '🇩🇰', name: 'Danimarca' },
+  { code: '+358', flag: '🇫🇮', name: 'Finlandia' },
+  { code: '+48', flag: '🇵🇱', name: 'Polonia' },
+  { code: '+420', flag: '🇨🇿', name: 'Rep. Ceca' },
+  { code: '+36', flag: '🇭🇺', name: 'Ungheria' },
+  { code: '+40', flag: '🇷🇴', name: 'Romania' },
+  { code: '+30', flag: '🇬🇷', name: 'Grecia' },
+  { code: '+385', flag: '🇭🇷', name: 'Croazia' },
+  { code: '+386', flag: '🇸🇮', name: 'Slovenia' },
+  { code: '+421', flag: '🇸🇰', name: 'Slovacchia' },
+  { code: '+353', flag: '🇮🇪', name: 'Irlanda' },
+  { code: '+352', flag: '🇱🇺', name: 'Lussemburgo' },
+  { code: '+356', flag: '🇲🇹', name: 'Malta' },
+  { code: '+359', flag: '🇧🇬', name: 'Bulgaria' },
+  { code: '+370', flag: '🇱🇹', name: 'Lituania' },
+  { code: '+371', flag: '🇱🇻', name: 'Lettonia' },
+  { code: '+372', flag: '🇪🇪', name: 'Estonia' },
+  { code: '+357', flag: '🇨🇾', name: 'Cipro' },
+  { code: '+1', flag: '🇺🇸', name: 'USA' },
+  { code: '+1', flag: '🇨🇦', name: 'Canada' },
+  { code: '+52', flag: '🇲🇽', name: 'Messico' },
+  { code: '+55', flag: '🇧🇷', name: 'Brasile' },
+  { code: '+54', flag: '🇦🇷', name: 'Argentina' },
+  { code: '+57', flag: '🇨🇴', name: 'Colombia' },
+  { code: '+56', flag: '🇨🇱', name: 'Cile' },
+  { code: '+51', flag: '🇵🇪', name: 'Peru' },
+  { code: '+58', flag: '🇻🇪', name: 'Venezuela' },
+  { code: '+593', flag: '🇪🇨', name: 'Ecuador' },
+  { code: '+91', flag: '🇮🇳', name: 'India' },
+  { code: '+86', flag: '🇨🇳', name: 'Cina' },
+  { code: '+81', flag: '🇯🇵', name: 'Giappone' },
+  { code: '+82', flag: '🇰🇷', name: 'Corea del Sud' },
+  { code: '+61', flag: '🇦🇺', name: 'Australia' },
+  { code: '+64', flag: '🇳🇿', name: 'Nuova Zelanda' },
+  { code: '+7', flag: '🇷🇺', name: 'Russia' },
+  { code: '+90', flag: '🇹🇷', name: 'Turchia' },
+  { code: '+966', flag: '🇸🇦', name: 'Arabia Saudita' },
+  { code: '+971', flag: '🇦🇪', name: 'Emirati Arabi' },
+  { code: '+20', flag: '🇪🇬', name: 'Egitto' },
+  { code: '+212', flag: '🇲🇦', name: 'Marocco' },
+  { code: '+216', flag: '🇹🇳', name: 'Tunisia' },
+  { code: '+213', flag: '🇩🇿', name: 'Algeria' },
+  { code: '+234', flag: '🇳🇬', name: 'Nigeria' },
+  { code: '+27', flag: '🇿🇦', name: 'Sudafrica' },
+  { code: '+254', flag: '🇰🇪', name: 'Kenya' },
+  { code: '+63', flag: '🇵🇭', name: 'Filippine' },
+  { code: '+62', flag: '🇮🇩', name: 'Indonesia' },
+  { code: '+66', flag: '🇹🇭', name: 'Thailandia' },
+  { code: '+84', flag: '🇻🇳', name: 'Vietnam' },
+  { code: '+60', flag: '🇲🇾', name: 'Malesia' },
+  { code: '+65', flag: '🇸🇬', name: 'Singapore' },
+  { code: '+852', flag: '🇭🇰', name: 'Hong Kong' },
+  { code: '+972', flag: '🇮🇱', name: 'Israele' },
+  { code: '+380', flag: '🇺🇦', name: 'Ucraina' },
+  { code: '+381', flag: '🇷🇸', name: 'Serbia' },
+  { code: '+355', flag: '🇦🇱', name: 'Albania' },
+  { code: '+382', flag: '🇲🇪', name: 'Montenegro' },
+  { code: '+387', flag: '🇧🇦', name: 'Bosnia' },
+  { code: '+389', flag: '🇲🇰', name: 'Macedonia del Nord' },
+]
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const statusColors: Record<string, string> = {
@@ -111,14 +188,6 @@ function formatDateIT(iso: string) {
   return new Date(iso).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 }
 
-function getSignerProgress(doc: Document): { total: number; signed: number } {
-  if (doc.signers && doc.signers.length > 0) {
-    const signed = doc.signers.filter(s => s.status === 'signed').length
-    return { total: doc.signers.length, signed }
-  }
-  // legacy single-signer
-  return { total: 1, signed: doc.status === 'signed' ? 1 : 0 }
-}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -143,7 +212,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', channel: 'email' }])
+  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email' }])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Scheduled send
@@ -289,9 +358,8 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   function handleSelectSignerCount(count: number) {
     setSignerCount(count)
-    // Initialize signer rows
     const rows: SignerRow[] = Array.from({ length: count }, () => ({
-      name: '', email: '', phone: '', channel: 'email'
+      name: '', email: '', phone: '', countryCode: '+39', channel: 'email'
     }))
     setSignerRows(rows)
   }
@@ -301,11 +369,22 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   function applyContactToSigner(index: number, contact: Contact) {
+    // Try to extract country code from stored phone
+    let countryCode = '+39'
+    let phoneNum = contact.phone || ''
+    if (phoneNum.startsWith('+')) {
+      const match = COUNTRY_CODES.find(cc => phoneNum.startsWith(cc.code))
+      if (match) {
+        countryCode = match.code
+        phoneNum = phoneNum.slice(match.code.length).trim()
+      }
+    }
     setSignerRows(prev => prev.map((r, i) => i === index ? {
       ...r,
       name: contact.name,
       email: contact.email,
-      phone: contact.phone || '',
+      phone: phoneNum,
+      countryCode,
       channel: contact.phone ? 'whatsapp' : 'email'
     } : r))
     setFocusedSignerField(null)
@@ -324,7 +403,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     e.preventDefault()
     if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
 
-    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
     if (validSigners.length === 0) {
       toast.error('Aggiungi almeno un destinatario con nome e email')
       return
@@ -369,7 +448,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   async function handleSendWithoutFields() {
-    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
     if (!selectedFile || validSigners.length === 0) return
 
     setUploading(true)
@@ -402,7 +481,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           signers: validSigners.map(s => ({
             name: s.name.trim(),
             email: s.email.trim(),
-            phone: s.phone.trim() || null,
+            phone: s.phone.trim() ? `${s.countryCode}${s.phone.trim()}` : null,
             channel: s.channel,
           }))
         })
@@ -426,7 +505,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function handleSaveDraft() {
     if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
-    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
 
     setUploading(true)
     try {
@@ -466,7 +545,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
     if (!scheduledDateTime) { toast.error('Seleziona data e ora'); return }
 
-    const validSigners = signerRows.filter(s => s.email.trim() && s.name.trim())
+    const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
     if (validSigners.length === 0) {
       toast.error('Aggiungi almeno un firmatario con nome e email')
       return
@@ -541,7 +620,7 @@ export default function DashboardPage({ session }: { session: Session }) {
           signers: editorSigners.map(s => ({
             name: s.name.trim(),
             email: s.email.trim(),
-            phone: s.phone.trim() || null,
+            phone: s.phone.trim() ? `${s.countryCode}${s.phone.trim()}` : null,
             channel: s.channel,
           }))
         })
@@ -1273,45 +1352,74 @@ export default function DashboardPage({ session }: { session: Session }) {
                           >WhatsApp</button>
                         </div>
 
-                        {/* Email with autocomplete */}
-                        <div className="relative">
-                          <input
-                            type="email"
-                            value={signer.email}
-                            onChange={e => updateSignerRow(i, 'email', e.target.value)}
-                            onFocus={() => setFocusedSignerField({ index: i, field: 'email' })}
-                            onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
-                            placeholder="email@esempio.com"
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                          />
-                          {/* Contact suggestions dropdown */}
-                          {focusedSignerField?.index === i && focusedSignerField?.field === 'email' && (() => {
-                            const suggestions = getContactSuggestions(signer.email, i)
-                            if (suggestions.length === 0) return null
-                            return (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
-                                {suggestions.map(contact => (
-                                  <button
-                                    key={contact.id}
-                                    type="button"
-                                    onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
-                                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
-                                  >
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                      <span className="text-xs font-bold text-gray-500">
-                                        {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                                      </span>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                                      <p className="text-xs text-gray-400 truncate">{contact.email}{contact.phone ? ` · ${contact.phone}` : ''}</p>
-                                    </div>
-                                  </button>
+                        {/* Email or Phone based on channel */}
+                        {signer.channel === 'email' ? (
+                          /* Email with autocomplete */
+                          <div className="relative">
+                            <input
+                              type="email"
+                              value={signer.email}
+                              onChange={e => updateSignerRow(i, 'email', e.target.value)}
+                              onFocus={() => setFocusedSignerField({ index: i, field: 'email' })}
+                              onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
+                              placeholder="email@esempio.com"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                            />
+                            {focusedSignerField?.index === i && focusedSignerField?.field === 'email' && (() => {
+                              const suggestions = getContactSuggestions(signer.email, i)
+                              if (suggestions.length === 0) return null
+                              return (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                                  {suggestions.map(contact => (
+                                    <button
+                                      key={contact.id}
+                                      type="button"
+                                      onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
+                                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                                    >
+                                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-xs font-bold text-gray-500">
+                                          {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                        </span>
+                                      </div>
+                                      <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                                        <p className="text-xs text-gray-400 truncate">{contact.email}{contact.phone ? ` · ${contact.phone}` : ''}</p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        ) : (
+                          /* WhatsApp: phone with country code dropdown */
+                          <div className="flex gap-2">
+                            <div className="relative flex-shrink-0">
+                              <select
+                                value={signer.countryCode}
+                                onChange={e => updateSignerRow(i, 'countryCode', e.target.value)}
+                                className="appearance-none border border-gray-200 rounded-xl pl-3 pr-8 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 w-[110px]"
+                              >
+                                {COUNTRY_CODES.map((cc, ci) => (
+                                  <option key={`${cc.code}-${ci}`} value={cc.code}>
+                                    {cc.flag} {cc.code}
+                                  </option>
                                 ))}
-                              </div>
-                            )
-                          })()}
-                        </div>
+                              </select>
+                              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                              </svg>
+                            </div>
+                            <input
+                              type="tel"
+                              value={signer.phone}
+                              onChange={e => updateSignerRow(i, 'phone', e.target.value.replace(/[^\d\s]/g, ''))}
+                              placeholder="347 1234567"
+                              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                            />
+                          </div>
+                        )}
 
                         {/* Name */}
                         <input
@@ -1319,15 +1427,6 @@ export default function DashboardPage({ session }: { session: Session }) {
                           value={signer.name}
                           onChange={e => updateSignerRow(i, 'name', e.target.value)}
                           placeholder="Nome e Cognome"
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                        />
-
-                        {/* Phone (show always for WhatsApp, optional for email) */}
-                        <input
-                          type="tel"
-                          value={signer.phone}
-                          onChange={e => updateSignerRow(i, 'phone', e.target.value)}
-                          placeholder={signer.channel === 'whatsapp' ? '+39 347 1234567' : '+39 347 1234567 (opzionale)'}
                           className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
                         />
                       </div>
@@ -1342,7 +1441,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   {/* Primary: place fields and send */}
                   <button
                     type="submit"
-                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                     className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-4 rounded-2xl transition-all text-[16px]"
                   >
                     {uploading ? (
@@ -1357,7 +1456,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                   <button
                     type="button"
                     onClick={handleSendWithoutFields}
-                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                    disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                     className="w-full text-gray-500 hover:text-gray-700 disabled:text-gray-300 text-sm font-medium py-2 transition-colors"
                   >
                     Invia senza campi
@@ -1378,7 +1477,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <button
                       type="button"
                       onClick={() => setShowSchedulePicker(!showSchedulePicker)}
-                      disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || !s.email.trim())}
+                      disabled={uploading || !selectedFile || signerRows.some(s => !s.name.trim() || (s.channel === 'email' ? !s.email.trim() : !s.phone.trim()))}
                       className="flex-1 border border-gray-200 hover:border-blue-300 bg-white hover:bg-blue-50 disabled:bg-gray-50 disabled:text-gray-300 text-gray-700 text-sm font-medium py-3 rounded-xl transition-all"
                     >
                       Invio Programmato

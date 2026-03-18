@@ -336,8 +336,8 @@ export const handler: Handler = async (event) => {
     }
 
     if (signerRow) {
-      // Verify OTP was completed
-      if (!signerRow.otp_verified) {
+      // Verify OTP was completed (skip if OTP not required)
+      if (signerRow.require_otp !== false && !signerRow.otp_verified) {
         return { statusCode: 400, body: JSON.stringify({ error: 'OTP non verificato' }) }
       }
 
@@ -590,7 +590,7 @@ export const handler: Handler = async (event) => {
       return { statusCode: 404, body: JSON.stringify({ error: 'Documento non trovato' }) }
     }
 
-    if (!doc.otp_verified) {
+    if (doc.require_otp !== false && !doc.otp_verified) {
       return { statusCode: 400, body: JSON.stringify({ error: 'OTP non verificato' }) }
     }
 

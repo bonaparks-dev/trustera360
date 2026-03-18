@@ -141,13 +141,18 @@ export const handler: Handler = async (event) => {
         return { statusCode: 500, body: JSON.stringify({ error: 'Errore nel salvataggio del codice' }) }
       }
 
-      // Try WhatsApp first, fallback to email
+      // Send OTP via the signer's notification channel
       let channel: 'whatsapp' | 'email' = 'email'
       const signerPhone = signerRow.signer_phone || ''
+      const notificationChannel = signerRow.notification_channel || 'email'
 
-      if (signerPhone) {
+      if (notificationChannel === 'whatsapp' && signerPhone) {
         const sent = await sendWhatsAppOtp(signerPhone, otp)
-        if (sent) channel = 'whatsapp'
+        if (sent) {
+          channel = 'whatsapp'
+        } else {
+          console.warn('[trustera-sign-otp] WhatsApp OTP failed, falling back to email for:', signerPhone)
+        }
       }
 
       if (channel === 'email') {

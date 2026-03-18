@@ -256,19 +256,19 @@ export default function SignPage() {
         )
       case 'date':
         return (
-          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-white rounded truncate">
             {val as string}
           </div>
         )
       case 'name':
         return (
-          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-white rounded truncate">
             {val as string}
           </div>
         )
       case 'email':
         return (
-          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-blue-50/50 rounded truncate">
+          <div className="w-full h-full flex items-center px-1 text-xs text-gray-700 bg-white rounded truncate">
             {val as string}
           </div>
         )

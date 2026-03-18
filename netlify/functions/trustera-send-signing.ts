@@ -121,7 +121,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { documentId, signers, requireOtp = true } = JSON.parse(event.body || '{}')
+    const { documentId, signers, requireOtp = true, approvers = [] } = JSON.parse(event.body || '{}')
 
     if (!documentId) {
       return { statusCode: 400, body: JSON.stringify({ error: 'documentId richiesto' }) }
@@ -303,6 +303,58 @@ export const handler: Handler = async (event) => {
       console.log('[trustera-send-signing] Signer processed:', signer.email)
     }
 
+    // Store approvers in document metadata
+    if (approvers && approvers.length > 0) {
+      await supabase
+        .from('trustera_documents')
+        .update({ approvers: approvers })
+        .eq('id', documentId)
+
+      // Send notification email to each approver
+      for (const approver of approvers) {
+        if (!approver.email) continue
+        try {
+          await resend.emails.send({
+            from: 'Trustera <info@trustera360.app>',
+            replyTo: 'info@trustera360.app',
+            to: approver.email,
+            subject: `${senderName} richiede la tua approvazione: ${doc.name}`,
+            text: `Ciao ${approver.name},\n\n${senderName} ha richiesto la tua approvazione per il documento "${doc.name}".\n\nI firmatari sono stati notificati e il documento è in attesa di firma.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+            html: `<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8" /></head>
+<body style="margin:0;padding:0;background:#f9fafb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="500" cellpadding="0" cellspacing="0" style="max-width:500px;background:#fff;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:32px 40px 0;text-align:center;">
+    <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" style="height:60px;width:auto;" />
+  </td></tr>
+  <tr><td style="padding:24px 40px;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;color:#333;line-height:1.6;">
+    <p style="margin:0 0 12px;">Ciao <strong>${approver.name}</strong>,</p>
+    <p style="margin:0 0 12px;"><strong>${senderName}</strong> ha richiesto la tua approvazione per il documento:</p>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin:16px 0;">
+      <p style="margin:0;font-weight:600;color:#16a34a;">${doc.name}</p>
+    </div>
+    <p style="margin:0;color:#666;font-size:13px;">I firmatari sono stati notificati. Riceverai una copia del documento firmato al completamento.</p>
+  </td></tr>
+  <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+  <tr><td style="padding:20px 40px 32px;text-align:center;">
+    <p style="margin:0;color:#d1d5db;font-family:system-ui,sans-serif;font-size:11px;">
+      Trustera - Infrastructure for Digital Trust<br/>
+      <a href="https://trustera360.app" style="color:#16a34a;text-decoration:none;">www.trustera360.app</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+          })
+          console.log('[trustera-send-signing] Approver notified:', approver.email)
+        } catch (err: any) {
+          console.warn('[trustera-send-signing] Approver email failed:', approver.email, err.message)
+        }
+      }
+    }
+
     // Update document status to pending
     const { error: statusError } = await supabase
       .from('trustera_documents')
@@ -315,7 +367,7 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({ success: true, signerCount: signers.length })
+      body: JSON.stringify({ success: true, signerCount: signers.length, approverCount: approvers.length })
     }
   } catch (error: any) {
     console.error('[trustera-send-signing] Error:', error)

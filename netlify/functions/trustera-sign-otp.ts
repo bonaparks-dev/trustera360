@@ -156,14 +156,23 @@ export const handler: Handler = async (event) => {
       }
 
       if (channel === 'email') {
-        await resend.emails.send({
-          from: 'Trustera <info@trustera360.app>',
-          replyTo: 'info@trustera360.app',
-          to: signerRow.signer_email,
-          subject: 'Codice di verifica Trustera',
-          text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
-          html: buildOtpEmailHtml(otp)
-        })
+        if (signerRow.signer_email) {
+          await resend.emails.send({
+            from: 'Trustera <info@trustera360.app>',
+            replyTo: 'info@trustera360.app',
+            to: signerRow.signer_email,
+            subject: 'Codice di verifica Trustera',
+            text: `Il tuo codice di verifica Trustera: ${otp}\n\nScade tra 10 minuti. Non condividere questo codice.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
+            html: buildOtpEmailHtml(otp)
+          })
+        } else if (signerPhone) {
+          // No email available, try WhatsApp as last resort
+          const sent = await sendWhatsAppOtp(signerPhone, otp)
+          if (sent) channel = 'whatsapp'
+          else return { statusCode: 500, body: JSON.stringify({ error: "Impossibile inviare il codice OTP. Nessun canale disponibile." }) }
+        } else {
+          return { statusCode: 500, body: JSON.stringify({ error: "Nessun canale disponibile per l'invio del codice OTP" }) }
+        }
       }
 
       return { statusCode: 200, body: JSON.stringify({ success: true, channel }) }

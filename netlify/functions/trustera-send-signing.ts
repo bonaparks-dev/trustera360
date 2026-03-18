@@ -130,10 +130,13 @@ export const handler: Handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'signers richiesto (array non vuoto)' }) }
     }
 
-    // Validate each signer has at least name + email
+    // Validate each signer has name + contact method (email or phone)
     for (const s of signers) {
-      if (!s.name || !s.email) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Ogni firmatario deve avere name e email' }) }
+      if (!s.name) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Ogni firmatario deve avere un nome' }) }
+      }
+      if (!s.email && !s.phone) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Ogni firmatario deve avere email o telefono' }) }
       }
     }
 

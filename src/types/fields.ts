@@ -18,6 +18,8 @@ export interface DocumentField {
   default_value?: string
   value?: string
   sort_order: number
+  font_size?: number
+  font_style?: string // 'handwriting' | 'serif' | 'sans-serif' | 'monospace'
 }
 
 export interface FieldTypeConfig {

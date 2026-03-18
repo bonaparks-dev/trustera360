@@ -30,6 +30,21 @@ interface PlacedField {
   required: boolean
   radioGroup?: string
   placeholder?: string
+  fontSize?: number
+  fontStyle?: string
+  defaultValue?: string
+}
+
+// Font options for signature fields
+const FONT_STYLES = [
+  { value: 'handwriting', label: 'Handwriting', css: "'Caveat', 'Dancing Script', cursive" },
+  { value: 'serif', label: 'Serif', css: "'Georgia', 'Times New Roman', serif" },
+  { value: 'sans-serif', label: 'Sans-serif', css: "'Helvetica', 'Arial', sans-serif" },
+  { value: 'monospace', label: 'Monospace', css: "'Courier New', monospace" },
+]
+
+function getFontCss(style?: string) {
+  return FONT_STYLES.find(f => f.value === style)?.css || FONT_STYLES[0].css
 }
 
 let fieldCounter = 0
@@ -83,6 +98,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   const [pdfError, setPdfError] = useState<string | null>(null)
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const [expandedSignerIndex, setExpandedSignerIndex] = useState<number | null>(0)
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
   function toggleSection(key: string) {
@@ -130,6 +146,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
 
   const addFieldAtPosition = useCallback((fieldType: FieldType, pageNumber: number, xPercent: number, yPercent: number) => {
     const config = FIELD_TYPES[fieldType]
+    const signer = signers[activeSignerIndex]
     const newField: PlacedField = {
       tempId: nextTempId(),
       fieldType,
@@ -140,12 +157,18 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
       widthPercent: config.defaultWidth,
       heightPercent: config.defaultHeight,
       required: true,
+      // Smart defaults
+      ...(fieldType === 'initials' && signer ? {
+        defaultValue: signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3),
+      } : {}),
+      ...(fieldType === 'signature' ? { fontStyle: 'handwriting', fontSize: 18 } : {}),
+      ...(fieldType === 'name' && signer ? { defaultValue: signer.name } : {}),
     }
     setFields(prev => [...prev, newField])
     setSelectedFieldId(newField.tempId)
     setTapPlaceType(null)
     setShowMobilePalette(false)
-  }, [activeSignerIndex])
+  }, [activeSignerIndex, signers])
 
   // ── Drag from palette (desktop) ────────────────────────────────────────────
 
@@ -275,9 +298,16 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
       required: f.required,
       placeholder: f.placeholder,
       radio_group: f.radioGroup,
+      default_value: f.defaultValue,
+      font_size: f.fontSize,
+      font_style: f.fontStyle,
       sort_order: i,
     }))
     onComplete(output as any)
+  }
+
+  function updateField(fieldId: string, updates: Partial<PlacedField>) {
+    setFields(prev => prev.map(f => f.tempId === fieldId ? { ...f, ...updates } : f))
   }
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
@@ -503,11 +533,21 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
                         '--tw-ring-color': color.hex,
                       } as any}
                       onClick={e => { e.stopPropagation(); setSelectedFieldId(field.tempId) }}
+                      onDoubleClick={e => { e.stopPropagation(); setEditingFieldId(field.tempId) }}
                       onMouseDown={e => handleFieldMouseDown(e, field.tempId, pageNum)}
                       onTouchStart={e => handleFieldMouseDown(e, field.tempId, pageNum)}
                     >
                       <FieldIcon type={field.fieldType} className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="truncate">{field.label || FIELD_TYPES[field.fieldType].label}</span>
+                      <span
+                        className="truncate"
+                        style={field.fieldType === 'signature' || field.fieldType === 'initials' ? {
+                          fontFamily: getFontCss(field.fontStyle),
+                          fontSize: field.fontSize ? `${Math.min(field.fontSize, 14)}px` : undefined,
+                          fontStyle: field.fieldType === 'initials' ? 'italic' : undefined,
+                        } : undefined}
+                      >
+                        {field.defaultValue || field.label || FIELD_TYPES[field.fieldType].label}
+                      </span>
 
                       {/* Delete button when selected */}
                       {isSelected && (
@@ -526,6 +566,186 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
           </Document>
         </div>
       </div>
+
+      {/* ── Field Settings Modal (double-click) ─────────────────────────── */}
+      {editingFieldId && (() => {
+        const field = fields.find(f => f.tempId === editingFieldId)
+        if (!field) return null
+        const signer = signers[field.signerIndex]
+        return (
+          <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4" onClick={() => setEditingFieldId(null)}>
+            <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold text-gray-900">Impostazioni campo</h3>
+                <button onClick={() => setEditingFieldId(null)} className="text-gray-400 hover:text-gray-600 p-1">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Field type indicator */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl">
+                  <FieldIcon type={field.fieldType} className="w-5 h-5 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-700">{FIELD_TYPES[field.fieldType].label}</span>
+                  {signer && <span className="ml-auto text-xs text-gray-400">{signer.name}</span>}
+                </div>
+
+                {/* Label */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Etichetta</label>
+                  <input
+                    type="text"
+                    value={field.label || ''}
+                    onChange={e => updateField(field.tempId, { label: e.target.value })}
+                    placeholder={FIELD_TYPES[field.fieldType].label}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                  />
+                </div>
+
+                {/* Default value — for initials, name, readonly, label */}
+                {['initials', 'name', 'readonly', 'label', 'signature'].includes(field.fieldType) && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+                      {field.fieldType === 'initials' ? 'Iniziali' : field.fieldType === 'signature' ? 'Nome completo' : 'Valore predefinito'}
+                    </label>
+                    <input
+                      type="text"
+                      value={field.defaultValue || ''}
+                      onChange={e => updateField(field.tempId, { defaultValue: e.target.value })}
+                      placeholder={
+                        field.fieldType === 'initials' ? (signer ? signer.name.split(' ').map(w => w[0]).join('').toUpperCase() : 'A.B.')
+                        : field.fieldType === 'signature' ? (signer?.name || 'Nome Cognome')
+                        : 'Testo...'
+                      }
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                  </div>
+                )}
+
+                {/* Placeholder — for text input */}
+                {field.fieldType === 'text' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Placeholder</label>
+                    <input
+                      type="text"
+                      value={field.placeholder || ''}
+                      onChange={e => updateField(field.tempId, { placeholder: e.target.value })}
+                      placeholder="Testo suggerito..."
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                  </div>
+                )}
+
+                {/* Font style — for signature and initials */}
+                {(field.fieldType === 'signature' || field.fieldType === 'initials') && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Stile font</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FONT_STYLES.map(fs => (
+                        <button
+                          key={fs.value}
+                          onClick={() => updateField(field.tempId, { fontStyle: fs.value })}
+                          className={`px-3 py-2.5 rounded-xl border text-sm transition-all ${
+                            (field.fontStyle || 'handwriting') === fs.value
+                              ? 'border-green-500 bg-green-50 text-green-700 font-medium'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          <span style={{ fontFamily: fs.css }}>{field.fieldType === 'initials' ? 'A.B.' : 'Mario R.'}</span>
+                          <span className="block text-[10px] text-gray-400 mt-0.5">{fs.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Font size */}
+                {['signature', 'initials', 'name', 'text', 'label', 'readonly'].includes(field.fieldType) && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">
+                      Dimensione font: {field.fontSize || 14}px
+                    </label>
+                    <input
+                      type="range"
+                      min={8}
+                      max={32}
+                      value={field.fontSize || 14}
+                      onChange={e => updateField(field.tempId, { fontSize: parseInt(e.target.value) })}
+                      className="w-full accent-green-600"
+                    />
+                    <div className="flex justify-between text-[10px] text-gray-300 mt-0.5">
+                      <span>8px</span><span>32px</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Required toggle */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700">Obbligatorio</span>
+                  <button
+                    onClick={() => updateField(field.tempId, { required: !field.required })}
+                    className={`w-10 h-6 rounded-full transition-colors ${field.required ? 'bg-green-500' : 'bg-gray-200'}`}
+                  >
+                    <div className={`w-4 h-4 bg-white rounded-full shadow transition-transform mx-1 ${field.required ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+
+                {/* Radio group — for radio buttons */}
+                {field.fieldType === 'radio' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wide">Gruppo radio</label>
+                    <input
+                      type="text"
+                      value={field.radioGroup || ''}
+                      onChange={e => updateField(field.tempId, { radioGroup: e.target.value })}
+                      placeholder="gruppo_1"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                    />
+                  </div>
+                )}
+
+                {/* Preview */}
+                {(field.fieldType === 'signature' || field.fieldType === 'initials') && (
+                  <div className="bg-gray-50 rounded-xl p-4 text-center">
+                    <span className="text-[10px] text-gray-400 uppercase tracking-wide block mb-2">Anteprima</span>
+                    <span
+                      style={{
+                        fontFamily: getFontCss(field.fontStyle),
+                        fontSize: `${field.fontSize || 18}px`,
+                        fontStyle: field.fieldType === 'initials' ? 'italic' : undefined,
+                      }}
+                      className="text-gray-800"
+                    >
+                      {field.defaultValue || (field.fieldType === 'initials'
+                        ? (signer?.name.split(' ').map(w => w[0]).join('').toUpperCase() || 'A.B.')
+                        : (signer?.name || 'Mario Rossi')
+                      )}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => setEditingFieldId(null)}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm"
+                >
+                  Salva
+                </button>
+                <button
+                  onClick={() => { deleteField(field.tempId); setEditingFieldId(null) }}
+                  className="px-4 py-2.5 border border-red-200 text-red-500 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+                >
+                  Elimina
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* ── Mobile bottom sheet (field palette) ────────────────────────────── */}
       <div className="md:hidden">

@@ -336,11 +336,25 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   async function loadContacts() {
     setContactsLoading(true)
-    const { data, error } = await supabase
-      .from('trustera_contacts')
-      .select('*')
-      .eq('owner_id', session.user.id)
-      .order('name')
+    // Fetch all contacts (Supabase default limit is 1000, so paginate)
+    let allContacts: any[] = []
+    let from = 0
+    const pageSize = 1000
+    let fetchError: any = null
+    while (true) {
+      const { data, error } = await supabase
+        .from('trustera_contacts')
+        .select('*')
+        .eq('owner_id', session.user.id)
+        .order('name')
+        .range(from, from + pageSize - 1)
+      if (error) { fetchError = error; break }
+      allContacts = allContacts.concat(data || [])
+      if (!data || data.length < pageSize) break
+      from += pageSize
+    }
+    const data = allContacts
+    const error = fetchError
     if (error) {
       console.error('Error loading contacts:', error)
     } else {

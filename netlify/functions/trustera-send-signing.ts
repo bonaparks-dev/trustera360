@@ -204,22 +204,46 @@ export const handler: Handler = async (event) => {
         }
       }
 
-      // Upsert into trustera_contacts (by owner_id + email)
-      if (doc.owner_id) {
-        const { error: contactError } = await supabase
+      // Upsert into trustera_contacts (by owner_id + email, normalized)
+      if (doc.owner_id && signer.email) {
+        const normalizedEmail = signer.email.trim().toLowerCase()
+        const normalizedPhone = signer.phone?.trim() || null
+
+        // Check if contact already exists (case-insensitive email match)
+        const { data: existingContact } = await supabase
           .from('trustera_contacts')
-          .upsert(
-            {
-              owner_id: doc.owner_id,
-              email: signer.email,
+          .select('id')
+          .eq('owner_id', doc.owner_id)
+          .ilike('email', normalizedEmail)
+          .maybeSingle()
+
+        if (existingContact) {
+          // Update existing contact
+          const { error: contactError } = await supabase
+            .from('trustera_contacts')
+            .update({
               name: signer.name,
-              phone: signer.phone || null,
+              phone: normalizedPhone,
               updated_at: new Date().toISOString()
-            },
-            { onConflict: 'owner_id,email' }
-          )
-        if (contactError) {
-          console.warn('[trustera-send-signing] Contact upsert failed:', contactError.message)
+            })
+            .eq('id', existingContact.id)
+          if (contactError) {
+            console.warn('[trustera-send-signing] Contact update failed:', contactError.message)
+          }
+        } else {
+          // Insert new contact
+          const { error: contactError } = await supabase
+            .from('trustera_contacts')
+            .insert({
+              owner_id: doc.owner_id,
+              email: normalizedEmail,
+              name: signer.name,
+              phone: normalizedPhone,
+              updated_at: new Date().toISOString()
+            })
+          if (contactError) {
+            console.warn('[trustera-send-signing] Contact insert failed:', contactError.message)
+          }
         }
       }
 

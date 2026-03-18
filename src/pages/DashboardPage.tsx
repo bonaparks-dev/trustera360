@@ -403,7 +403,34 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (error) {
       console.error('Error loading contacts:', error)
     } else {
-      setContacts(data || [])
+      // Deduplicate contacts by email (keep the most recently updated)
+      const seen = new Map<string, typeof data[0]>()
+      const dupeIds: string[] = []
+      for (const c of (data || [])) {
+        const key = (c.email || '').toLowerCase().trim()
+        if (!key) continue
+        const existing = seen.get(key)
+        if (existing) {
+          // Keep the one with more recent updated_at, mark the other for deletion
+          const existingDate = new Date(existing.updated_at || existing.created_at || 0)
+          const currentDate = new Date(c.updated_at || c.created_at || 0)
+          if (currentDate > existingDate) {
+            dupeIds.push(existing.id)
+            seen.set(key, c)
+          } else {
+            dupeIds.push(c.id)
+          }
+        } else {
+          seen.set(key, c)
+        }
+      }
+      // Clean up duplicates in background
+      if (dupeIds.length > 0) {
+        supabase.from('trustera_contacts').delete().in('id', dupeIds).then(() => {
+          console.log(`Cleaned ${dupeIds.length} duplicate contacts`)
+        })
+      }
+      setContacts(Array.from(seen.values()))
     }
     setContactsLoading(false)
   }

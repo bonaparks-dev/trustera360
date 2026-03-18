@@ -569,6 +569,62 @@ export const handler: Handler = async (event) => {
         }
       }
 
+      // Send signed PDF to approvers if any
+      if (Array.isArray(doc.approvers) && doc.approvers.length > 0) {
+        const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
+        for (const approver of doc.approvers) {
+          if (!approver.email) continue
+          try {
+            const approverSubject = `Documento firmato: ${doc.name}`
+            const approverBodyText = `Ciao ${approver.name},\n\nIl documento "${doc.name}" che hai approvato è stato firmato da tutti i firmatari (${signerNamesList}).\n\nIl PDF firmato è in allegato.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`
+            await resend.emails.send({
+              from: 'Trustera <info@trustera360.app>',
+              replyTo: 'info@trustera360.app',
+              to: approver.email,
+              subject: approverSubject,
+              text: approverBodyText,
+              html: `<!DOCTYPE html>
+<html lang="it"><head><meta charset="UTF-8" /></head>
+<body style="margin:0;padding:0;background:#f9fafb;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;">
+<tr><td align="center" style="padding:40px 20px;">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border-radius:12px;overflow:hidden;">
+  <tr><td style="padding:32px 40px 0;text-align:center;">
+    <img src="https://trustera360.app/trustera-logo.jpeg" alt="Trustera" style="height:80px;width:auto;max-width:200px;" />
+  </td></tr>
+  <tr><td style="padding:24px 40px 0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:15px;color:#333;line-height:1.6;">
+    <p style="margin:0 0 12px;">Ciao <strong>${approver.name}</strong>,</p>
+    <p style="margin:0 0 12px;">Il documento <strong>${doc.name}</strong> che hai approvato è stato firmato da tutti i firmatari.</p>
+    <p style="margin:0 0 12px;">Firmatari: <strong>${signerNamesList}</strong></p>
+    <p style="margin:0;">Il PDF firmato è in allegato a questa email.</p>
+  </td></tr>
+  <tr><td style="padding:28px 40px;text-align:center;">
+    <div style="display:inline-block;background-color:#f0fdf4;color:#16a34a;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;border:1px solid #bbf7d0;">
+      PDF allegato
+    </div>
+  </td></tr>
+  <tr><td style="padding:0 40px;"><hr style="border:none;border-top:1px solid #e5e7eb;margin:0;" /></td></tr>
+  <tr><td style="padding:24px 40px 32px;text-align:center;">
+    <p style="margin:0;color:#d1d5db;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:11px;">
+      Trustera - Infrastructure for Digital Trust<br/>
+      <a href="https://trustera360.app" style="color:#16a34a;text-decoration:none;">www.trustera360.app</a>
+    </p>
+  </td></tr>
+</table>
+</td></tr></table>
+</body></html>`,
+              attachments: [{
+                filename: `${doc.name.replace(/[^a-zA-Z0-9._-]/g, '_')}_firmato.pdf`,
+                content: signedPdfBuffer,
+              }]
+            })
+            console.log('[trustera-sign-complete] Approver signed PDF email sent to:', approver.email)
+          } catch (approverEmailErr: any) {
+            console.warn('[trustera-sign-complete] Approver email failed for', approver.email, ':', approverEmailErr.message)
+          }
+        }
+      }
+
       console.log('[trustera-sign-complete] All signers done for doc:', doc.id, '— signed PDF uploaded:', fileName)
 
       return {

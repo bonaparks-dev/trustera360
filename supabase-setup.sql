@@ -130,3 +130,17 @@ CREATE POLICY "Service role full access on signed_documents_log"
 -- 8. Make sure Supabase storage bucket 'trustera' exists and allows public reads
 -- (This must be done via the Supabase Dashboard > Storage > Create bucket "trustera")
 -- Set it to PUBLIC so PDFs can be accessed by react-pdf in the browser.
+
+-- 9. Approver workflow columns on trustera_documents
+-- approvers: jsonb array of { name, email, token, status: 'pending'|'approved'|'rejected', reason?, acted_at? }
+-- approval_status: overall approval state
+-- draft_signers: signers held until all approvers approve
+ALTER TABLE trustera_documents
+  ADD COLUMN IF NOT EXISTS approvers jsonb DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS approval_status text DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS draft_signers jsonb DEFAULT NULL;
+
+-- Optional: index on approval_status for the approval token lookup query
+CREATE INDEX IF NOT EXISTS idx_trustera_documents_approval_status
+  ON trustera_documents (approval_status)
+  WHERE approval_status IS NOT NULL;

@@ -67,6 +67,7 @@ interface Document {
   id: string
   name: string
   status: 'draft' | 'scheduled' | 'pending' | 'signed' | 'deleted'
+  approval_status?: 'awaiting_approval' | 'approved' | 'rejected' | null
   created_at: string
   // legacy single-signer fields
   signer_email?: string
@@ -221,6 +222,7 @@ const statusColors: Record<string, string> = {
   draft: 'bg-gray-400',
   scheduled: 'bg-blue-500',
   pending: 'bg-yellow-500',
+  awaiting_approval: 'bg-amber-500',
   signed: 'bg-green-600',
   deleted: 'bg-red-400',
 }
@@ -229,8 +231,14 @@ const statusLabels: Record<string, string> = {
   draft: 'Bozza',
   scheduled: 'Programmato',
   pending: 'In attesa',
+  awaiting_approval: 'In attesa di approvazione',
   signed: 'Firmato',
   deleted: 'Cestino',
+}
+
+function getDocDisplayStatus(doc: Document): string {
+  if (doc.approval_status === 'awaiting_approval') return 'awaiting_approval'
+  return doc.status
 }
 
 function formatDateIT(iso: string) {
@@ -1180,7 +1188,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const totalSent = sentDocuments.length
   const draftCount = sentDocuments.filter(d => d.status === 'draft' || d.status === 'scheduled').length
   const deletedCount = sentDocuments.filter(d => d.status === 'deleted').length
-  const pendingCount = sentDocuments.filter(d => d.status === 'pending').length
+  const pendingCount = sentDocuments.filter(d => d.status === 'pending' || d.approval_status === 'awaiting_approval').length
   const signedSentCount = sentDocuments.filter(d => d.status === 'signed').length
   const signedByMeCount = signedByMeDocuments.length
 
@@ -1189,7 +1197,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const filteredDocuments = baseDocuments.filter(doc => {
     // Status filter
     if (docFilter === 'tutte' && doc.status === 'deleted') return false
-    if (docFilter === 'in_corso' && doc.status !== 'pending') return false
+    if (docFilter === 'in_corso' && doc.status !== 'pending' && doc.approval_status !== 'awaiting_approval') return false
     if (docFilter === 'completate' && doc.status !== 'signed') return false
     if (docFilter === 'bozza' && doc.status !== 'draft' && doc.status !== 'scheduled') return false
     if (docFilter === 'cestino' && doc.status !== 'deleted') return false
@@ -1502,8 +1510,8 @@ export default function DashboardPage({ session }: { session: Session }) {
                           {/* Right: status + actions */}
                           <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="flex items-center gap-1.5">
-                              <span className={`w-2 h-2 rounded-full ${statusColors[doc.status]}`} />
-                              <span className="text-sm font-medium text-gray-600">{statusLabels[doc.status]}</span>
+                              <span className={`w-2 h-2 rounded-full ${statusColors[getDocDisplayStatus(doc)] || 'bg-gray-400'}`} />
+                              <span className="text-sm font-medium text-gray-600">{statusLabels[getDocDisplayStatus(doc)] || doc.status}</span>
                             </div>
                             {doc.signed_pdf_url && (
                               <a

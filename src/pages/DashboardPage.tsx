@@ -960,22 +960,24 @@ export default function DashboardPage({ session }: { session: Session }) {
       }
 
       // Insert contacts without email one by one (each needs unique placeholder)
+      // Pre-load existing no-email contacts for duplicate check
+      const { data: existingNoEmail } = await supabase
+        .from('trustera_contacts')
+        .select('name, phone')
+        .eq('owner_id', session.user.id)
+        .like('email', '%@noemail')
+      const normalizePhone = (p: string) => p.replace(/[\s\-\(\)\+]/g, '')
+      const existingSet = new Set(
+        (existingNoEmail || []).map(e => `${e.name.trim().toLowerCase()}|${e.phone ? normalizePhone(e.phone) : ''}`)
+      )
+
       for (const c of withoutEmail) {
         const placeholder = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}@noemail`
-        // Check if contact with same name+phone already exists
         const lookupPhone = c.phone || null
-        let exists = false
-        if (lookupPhone) {
-          const { data } = await supabase
-            .from('trustera_contacts')
-            .select('id')
-            .eq('owner_id', session.user.id)
-            .eq('phone', lookupPhone)
-            .eq('name', c.name)
-            .maybeSingle()
-          if (data) exists = true
-        }
+        const key = `${c.name.trim().toLowerCase()}|${lookupPhone ? normalizePhone(lookupPhone) : ''}`
+        const exists = existingSet.has(key)
         if (!exists) {
+          existingSet.add(key) // prevent duplicates within same import
           const { error } = await supabase
             .from('trustera_contacts')
             .insert({
@@ -1720,7 +1722,9 @@ export default function DashboardPage({ session }: { session: Session }) {
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-800 text-sm">{contact.name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{contact.email}</p>
+                        {contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email) && (
+                          <p className="text-xs text-gray-400 mt-0.5">{contact.email}</p>
+                        )}
                         {contact.phone && <p className="text-xs text-gray-400">{contact.phone}</p>}
                       </div>
                       <button
@@ -1900,7 +1904,13 @@ export default function DashboardPage({ session }: { session: Session }) {
                                       </div>
                                       <div className="min-w-0">
                                         <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                                        <p className="text-xs text-gray-400 truncate">{contact.email}{contact.phone ? ` · ${contact.phone}` : ''}</p>
+                                        <p className="text-xs text-gray-400 truncate">{(() => {
+                                          const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
+                                          if (hasRealEmail && contact.phone) return `${contact.email} · ${contact.phone}`
+                                          if (hasRealEmail) return contact.email
+                                          if (contact.phone) return contact.phone
+                                          return ''
+                                        })()}</p>
                                       </div>
                                     </button>
                                   ))}

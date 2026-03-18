@@ -15,6 +15,7 @@ const SecurityPage = lazy(() => import('./pages/SecurityPage'))
 const SignPage = lazy(() => import('./pages/SignPage'))
 const FirmaPage = lazy(() => import('./pages/FirmaPage'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const VerifyPage = lazy(() => import('./pages/VerifyPage'))
 
 function ProtectedRoute({ session, children }: { session: Session | null; children: React.ReactNode }) {
   if (!session) return <Navigate to="/login" replace />
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/sign/:token" element={<SignPage />} />
         <Route path="/firma/:token" element={<FirmaPage />} />
+        <Route path="/verify/:hash" element={<VerifyPage />} />
       </Routes>
     </Suspense>
   )

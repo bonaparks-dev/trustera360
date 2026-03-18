@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import { Resend } from 'resend'
 import crypto from 'crypto'
+import QRCode from 'qrcode'
 
 // Trustera Supabase — primary
 const supabase = createClient(
@@ -188,71 +189,77 @@ async function buildSignedPdf(
     })
   }
 
-  // Add one attestation page per signer
-  for (const signer of signers) {
-    const page = pdfDoc.addPage([595, 842]) // A4
-    const { height } = page.getSize()
-    let y = height - 60
+  // Add verification QR code page
+  const verifyUrl = `https://trustera360.app/verify/${originalHash}`
+  const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 200, margin: 1 })
+  const qrImage = await pdfDoc.embedPng(qrPng)
 
-    // Title
-    page.drawText('ATTESTAZIONE DI FIRMA ELETTRONICA', {
-      x: 50, y, size: 16, font: boldFont, color: rgb(0.05, 0.24, 0.16)
-    })
-    y -= 30
+  const qrPage = pdfDoc.addPage([595, 842]) // A4
+  const { height: qrPageH, width: qrPageW } = qrPage.getSize()
 
-    page.drawText('Certificato da Trustera', {
-      x: 50, y, size: 11, font, color: rgb(0.4, 0.4, 0.4)
-    })
-    y -= 40
+  // Title
+  qrPage.drawText('CERTIFICATO DI FIRMA ELETTRONICA', {
+    x: 50, y: qrPageH - 60, size: 16, font: boldFont, color: rgb(0.05, 0.24, 0.16)
+  })
+  qrPage.drawText('Certificato da Trustera', {
+    x: 50, y: qrPageH - 85, size: 11, font, color: rgb(0.4, 0.4, 0.4)
+  })
 
-    const signedAtFormatted = new Date(signer.signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+  // QR code centered
+  const qrSize = 160
+  const qrX = (qrPageW - qrSize) / 2
+  const qrY = qrPageH - 100 - qrSize - 40
+  qrPage.drawImage(qrImage, { x: qrX, y: qrY, width: qrSize, height: qrSize })
 
-    const lines = [
-      { label: 'Documento:', value: documentName },
-      { label: 'Firmatario:', value: signer.name },
-      { label: 'Email:', value: signer.email },
-      { label: 'Data e Ora:', value: signedAtFormatted },
-      { label: 'Metodo:', value: 'OTP (One-Time Password)' },
-      { label: 'Indirizzo IP:', value: signer.signing_ip },
-      { label: 'User Agent:', value: signer.signing_user_agent.substring(0, 80) },
-      { label: 'Hash SHA-256:', value: originalHash }
-    ]
+  // Label under QR
+  const scanText = 'Scansiona per verificare il documento'
+  const scanTextWidth = font.widthOfTextAtSize(scanText, 10)
+  qrPage.drawText(scanText, {
+    x: (qrPageW - scanTextWidth) / 2, y: qrY - 20, size: 10, font, color: rgb(0.4, 0.4, 0.4)
+  })
 
-    for (const line of lines) {
-      page.drawText(line.label, { x: 50, y, size: 10, font: boldFont, color: rgb(0.2, 0.2, 0.2) })
-      // Long values may overflow — split at 80 chars
-      const value = line.value || 'N/A'
-      if (value.length > 60) {
-        page.drawText(value.substring(0, 60), { x: 180, y, size: 10, font, color: rgb(0.3, 0.3, 0.3) })
-        y -= 16
-        page.drawText(value.substring(60, 120), { x: 180, y, size: 10, font, color: rgb(0.3, 0.3, 0.3) })
-      } else {
-        page.drawText(value, { x: 180, y, size: 10, font, color: rgb(0.3, 0.3, 0.3) })
-      }
-      y -= 22
+  // Summary info below QR
+  let infoY = qrY - 55
+  const signerNamesList2 = signers.map(s => s.name).join(', ')
+  const signedAtFormatted = new Date(signers[0].signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+
+  const infoLines = [
+    { label: 'Documento:', value: documentName },
+    { label: 'Firmatari:', value: signerNamesList2 },
+    { label: 'Data firma:', value: signedAtFormatted },
+    { label: 'Hash SHA-256:', value: originalHash }
+  ]
+
+  for (const line of infoLines) {
+    qrPage.drawText(line.label, { x: 50, y: infoY, size: 9, font: boldFont, color: rgb(0.3, 0.3, 0.3) })
+    const value = line.value || 'N/A'
+    if (value.length > 65) {
+      qrPage.drawText(value.substring(0, 65), { x: 160, y: infoY, size: 9, font, color: rgb(0.4, 0.4, 0.4) })
+      infoY -= 14
+      qrPage.drawText(value.substring(65), { x: 160, y: infoY, size: 9, font, color: rgb(0.4, 0.4, 0.4) })
+    } else {
+      qrPage.drawText(value, { x: 160, y: infoY, size: 9, font, color: rgb(0.4, 0.4, 0.4) })
     }
-
-    y -= 20
-    page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) })
-    y -= 25
-
-    page.drawText('Questo documento è stato firmato elettronicamente tramite la piattaforma Trustera.', {
-      x: 50, y, size: 9, font, color: rgb(0.5, 0.5, 0.5)
-    })
-    y -= 16
-    page.drawText('La firma è conforme al Regolamento eIDAS (UE) 910/2014 per firme elettroniche semplici.', {
-      x: 50, y, size: 9, font, color: rgb(0.5, 0.5, 0.5)
-    })
-    y -= 16
-    page.drawText('Il documento originale non è stato alterato dopo la firma.', {
-      x: 50, y, size: 9, font, color: rgb(0.5, 0.5, 0.5)
-    })
-
-    // Footer
-    page.drawText('www.trustera360.app', {
-      x: 50, y: 40, size: 8, font, color: rgb(0.09, 0.64, 0.27)
-    })
+    infoY -= 20
   }
+
+  // Separator + legal text
+  infoY -= 10
+  qrPage.drawLine({ start: { x: 50, y: infoY }, end: { x: 545, y: infoY }, thickness: 1, color: rgb(0.85, 0.85, 0.85) })
+  infoY -= 20
+
+  qrPage.drawText('Questo documento è stato firmato elettronicamente tramite la piattaforma Trustera.', {
+    x: 50, y: infoY, size: 8, font, color: rgb(0.5, 0.5, 0.5)
+  })
+  infoY -= 14
+  qrPage.drawText('La firma è conforme al Regolamento eIDAS (UE) 910/2014 per firme elettroniche semplici.', {
+    x: 50, y: infoY, size: 8, font, color: rgb(0.5, 0.5, 0.5)
+  })
+
+  // Footer
+  qrPage.drawText('www.trustera360.app', {
+    x: 50, y: 40, size: 8, font, color: rgb(0.09, 0.64, 0.27)
+  })
 
   return pdfDoc.save()
 }

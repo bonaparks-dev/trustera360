@@ -5,7 +5,51 @@ import toast from 'react-hot-toast'
 import type { Session } from '@supabase/supabase-js'
 import type { DocumentField } from '../types/fields'
 
+import { PDFDocument } from 'pdf-lib'
+
 const FieldPlacementEditor = lazy(() => import('../components/FieldPlacementEditor'))
+
+// Convert non-PDF files to PDF
+async function convertFileToPdf(file: File): Promise<File> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+
+  // Already PDF
+  if (ext === 'pdf') return file
+
+  // Images → embed in a PDF page
+  if (['jpg', 'jpeg', 'png'].includes(ext)) {
+    const bytes = await file.arrayBuffer()
+    const pdfDoc = await PDFDocument.create()
+    let img
+    if (ext === 'png') {
+      img = await pdfDoc.embedPng(bytes)
+    } else {
+      img = await pdfDoc.embedJpg(bytes)
+    }
+    // Fit image on A4 page with margins
+    const a4W = 595, a4H = 842, margin = 40
+    const maxW = a4W - margin * 2, maxH = a4H - margin * 2
+    const scale = Math.min(maxW / img.width, maxH / img.height, 1)
+    const w = img.width * scale, h = img.height * scale
+    const page = pdfDoc.addPage([a4W, a4H])
+    page.drawImage(img, { x: (a4W - w) / 2, y: a4H - margin - h, width: w, height: h })
+    const pdfBytes = await pdfDoc.save()
+    const pdfName = file.name.replace(/\.[^.]+$/, '.pdf')
+    return new File([pdfBytes], pdfName, { type: 'application/pdf' })
+  }
+
+  // Other formats (docx, doc, odt, etc.) → convert via Netlify function
+  const formData = new FormData()
+  formData.append('file', file)
+  const resp = await fetch('/.netlify/functions/convert-to-pdf', { method: 'POST', body: formData })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ error: 'Conversione fallita' }))
+    throw new Error(err.error || 'Conversione fallita')
+  }
+  const pdfBlob = await resp.blob()
+  const pdfName = file.name.replace(/\.[^.]+$/, '.pdf')
+  return new File([pdfBlob], pdfName, { type: 'application/pdf' })
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -218,6 +262,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   // Upload modal
   const [showUploadModal, setShowUploadModal] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email' }])
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -488,7 +533,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         }
         docId = editingDraftId
       } else {
-        if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+        if (!selectedFile) { toast.error('Seleziona un documento'); return }
         const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
         const { error: uploadError } = await supabase.storage
           .from('trustera')
@@ -541,7 +586,7 @@ export default function DashboardPage({ session }: { session: Session }) {
         await supabase.from('trustera_documents').update({ status: 'pending', draft_signers: null }).eq('id', editingDraftId)
         docId = editingDraftId
       } else {
-        if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+        if (!selectedFile) { toast.error('Seleziona un documento'); return }
         const fileName = `documents/${session.user.id}/${Date.now()}_${selectedFile.name}`
         const { error: uploadError } = await supabase.storage
           .from('trustera')
@@ -600,7 +645,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   async function handleSaveDraft() {
-    if (!selectedFile && !editingDraftId) { toast.error('Seleziona un file PDF'); return }
+    if (!selectedFile && !editingDraftId) { toast.error('Seleziona un documento'); return }
     const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
 
     setUploading(true)
@@ -659,7 +704,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   async function handleScheduledSend() {
-    if (!selectedFile) { toast.error('Seleziona un file PDF'); return }
+    if (!selectedFile) { toast.error('Seleziona un documento'); return }
     if (!scheduledDateTime) { toast.error('Seleziona data e ora'); return }
 
     const validSigners = signerRows.filter(s => s.name.trim() && (s.channel === 'email' ? s.email.trim() : s.phone.trim()))
@@ -1786,8 +1831,16 @@ export default function DashboardPage({ session }: { session: Session }) {
 
               {/* File upload */}
               <div className="py-4 border-b border-gray-100">
-                <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-2">Documento PDF</label>
-                {!selectedFile && !editingDraftPdfUrl ? (
+                <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-2">Documento</label>
+                {converting ? (
+                  <div className="w-full border-2 border-dashed border-green-300 rounded-2xl py-8 flex flex-col items-center gap-2 bg-green-50/30">
+                    <svg className="w-8 h-8 text-green-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    <span className="text-sm text-green-600">Conversione in PDF...</span>
+                  </div>
+                ) : !selectedFile && !editingDraftPdfUrl ? (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -1796,7 +1849,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m3.75 9v6m3-3H9m1.5-12H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
                     </svg>
-                    <span className="text-sm text-gray-400">Tocca per selezionare un PDF</span>
+                    <span className="text-sm text-gray-400">PDF, Word, immagini...</span>
                   </button>
                 ) : !selectedFile && editingDraftPdfUrl ? (
                   <div className="space-y-2">
@@ -1837,7 +1890,25 @@ export default function DashboardPage({ session }: { session: Session }) {
                     </button>
                   </div>
                 )}
-                <input ref={fileInputRef} type="file" accept=".pdf" onChange={e => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+                <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.odt,.xls,.xlsx,.ppt,.pptx,.txt,.rtf,.jpg,.jpeg,.png" onChange={async e => {
+                  const file = e.target.files?.[0]
+                  if (!file) { setSelectedFile(null); return }
+                  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+                  if (ext === 'pdf') {
+                    setSelectedFile(file)
+                  } else {
+                    try {
+                      setConverting(true)
+                      const converted = await convertFileToPdf(file)
+                      setSelectedFile(converted)
+                    } catch (err: any) {
+                      toast.error(err.message || 'Errore nella conversione del file')
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    } finally {
+                      setConverting(false)
+                    }
+                  }
+                }} className="hidden" />
               </div>
 
               {/* Firmatari section */}

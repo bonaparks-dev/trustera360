@@ -87,6 +87,19 @@ const GLOBAL_FIELD_TYPES: FieldType[] = ['readonly', 'initials']
 const SIGNER_FIELD_TYPES: FieldType[] = ['signature', 'date', 'name', 'email', 'text', 'label', 'checkbox', 'radio']
 
 export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCancel }: FieldPlacementEditorProps) {
+  const [numPages, setNumPages] = useState(0)
+  const [fields, setFields] = useState<PlacedField[]>([])
+  const [activeSignerIndex, setActiveSignerIndex] = useState(0)
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(true)
+  const [showMobilePalette, setShowMobilePalette] = useState(false)
+  const [tapPlaceType, setTapPlaceType] = useState<FieldType | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
+  const [expandedSignerIndex, setExpandedSignerIndex] = useState<number | null>(0)
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map())
 
   function toggleSection(key: string) {
     setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))

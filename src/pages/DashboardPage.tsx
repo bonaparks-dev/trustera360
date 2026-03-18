@@ -35,7 +35,7 @@ async function convertFileToPdf(file: File): Promise<File> {
     page.drawImage(img, { x: (a4W - w) / 2, y: a4H - margin - h, width: w, height: h })
     const pdfBytes = await pdfDoc.save()
     const pdfName = file.name.replace(/\.[^.]+$/, '.pdf')
-    return new File([pdfBytes], pdfName, { type: 'application/pdf' })
+    return new File([pdfBytes.buffer], pdfName, { type: 'application/pdf' })
   }
 
   // Other formats (docx, doc, odt, etc.) → convert via Netlify function
@@ -1946,6 +1946,108 @@ export default function DashboardPage({ session }: { session: Session }) {
                 }} className="hidden" />
               </div>
 
+              {/* Approvatori section */}
+              <div className="py-4 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <label className="text-[13px] font-medium text-gray-500 uppercase tracking-wide">Approvatori</label>
+                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{approverRows.length}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setShowApproverSearch(true); setApproverSearchQuery('') }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* Added approvers */}
+                {approverRows.length > 0 && (
+                  <div className="space-y-2 mb-3">
+                    {approverRows.map((a, i) => (
+                      <div key={i} className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
+                        <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-amber-700 font-bold text-[10px]">
+                            {a.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{a.name}</p>
+                          {a.email && <p className="text-xs text-gray-400 truncate">{a.email}</p>}
+                        </div>
+                        <button type="button" onClick={() => setApproverRows(prev => prev.filter((_, idx) => idx !== i))} className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Approver search */}
+                {showApproverSearch && (
+                  <div className="border border-gray-200 rounded-xl p-3 bg-white">
+                    <div className="flex items-center gap-2 mb-2">
+                      <p className="text-xs font-semibold text-gray-500 flex-1">Aggiungi approvatore</p>
+                      <button type="button" onClick={() => setShowApproverSearch(false)} className="text-gray-400 hover:text-gray-600">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">Contatti Trustera</p>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <svg className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                        <input type="text" value={approverSearchQuery} onChange={e => setApproverSearchQuery(e.target.value)} placeholder="Cerca un approvatore o creane uno" className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500" />
+                      </div>
+                      <button type="button" onClick={() => {
+                        if (approverSearchQuery.trim()) {
+                          const isEmail = approverSearchQuery.includes('@')
+                          setApproverRows(prev => [...prev, { name: isEmail ? approverSearchQuery.split('@')[0] : approverSearchQuery.trim(), email: isEmail ? approverSearchQuery.trim() : '' }])
+                          setApproverSearchQuery('')
+                          setShowApproverSearch(false)
+                        }
+                      }} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap">NUOVO</button>
+                    </div>
+                    {approverSearchQuery.trim().length > 0 && (
+                      <div className="mt-2 max-h-36 overflow-y-auto space-y-1">
+                        {contacts
+                          .filter(c => c.name.toLowerCase().includes(approverSearchQuery.toLowerCase()) || (c.email && c.email.toLowerCase().includes(approverSearchQuery.toLowerCase())))
+                          .filter(c => !approverRows.some(a => a.name === c.name && a.email === c.email))
+                          .slice(0, 8)
+                          .map(contact => {
+                            const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
+                            return (
+                              <button key={contact.id} type="button" onClick={() => {
+                                setApproverRows(prev => [...prev, { name: contact.name, email: hasRealEmail ? contact.email : '' }])
+                                setApproverSearchQuery('')
+                                setShowApproverSearch(false)
+                              }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-left">
+                                <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                  <span className="text-amber-700 font-bold text-[10px]">{contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}</span>
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                                  <p className="text-xs text-gray-400 truncate">{hasRealEmail ? contact.email : contact.phone || ''}</p>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        {contacts.filter(c => c.name.toLowerCase().includes(approverSearchQuery.toLowerCase()) || (c.email && c.email.toLowerCase().includes(approverSearchQuery.toLowerCase()))).filter(c => !approverRows.some(a => a.name === c.name && a.email === c.email)).length === 0 && (
+                          <p className="text-xs text-gray-400 text-center py-2">Nessun contatto trovato. Premi NUOVO per crearne uno.</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* Firmatari section */}
               <div className="py-4">
                 <label className="block text-[13px] font-medium text-gray-500 uppercase tracking-wide mb-3">Firmatari</label>
@@ -2119,160 +2221,6 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <p className="text-[12px] text-gray-400 mt-2">
                       Il firmatario riceverà un codice OTP per verificare la sua identità prima di firmare.
                     </p>
-                  )}
-                </div>
-              )}
-
-              {/* Approvatori section */}
-              {signerCount > 0 && (
-                <div className="mt-4 border border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Approvatori</p>
-                      <span className="text-xs font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{approverRows.length}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowApproverSearch(true); setApproverSearchQuery('') }}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-                    >
-                      <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* Added approvers list */}
-                  {approverRows.length > 0 && (
-                    <div className="space-y-2 mb-3">
-                      {approverRows.map((a, i) => (
-                        <div key={i} className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-3 py-2.5">
-                          <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-amber-700 font-bold text-[10px]">
-                              {a.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                            </span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{a.name}</p>
-                            {a.email && <p className="text-xs text-gray-400 truncate">{a.email}</p>}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setApproverRows(prev => prev.filter((_, idx) => idx !== i))}
-                            className="p-1 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Approver search/add modal */}
-                  {showApproverSearch && (
-                    <div className="border border-gray-200 rounded-xl p-3 bg-white">
-                      <div className="flex items-center gap-2 mb-2">
-                        <p className="text-xs font-semibold text-gray-500 flex-1">Aggiungi approvatore</p>
-                        <button type="button" onClick={() => setShowApproverSearch(false)} className="text-gray-400 hover:text-gray-600">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-
-                      <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5">Contatti Trustera</p>
-
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <svg className="w-4 h-4 text-gray-300 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                          </svg>
-                          <input
-                            type="text"
-                            value={approverSearchQuery}
-                            onChange={e => setApproverSearchQuery(e.target.value)}
-                            placeholder="Cerca un approvatore o creane uno"
-                            className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:border-green-500"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (approverSearchQuery.trim()) {
-                              // Check if it looks like an email
-                              const isEmail = approverSearchQuery.includes('@')
-                              if (isEmail) {
-                                setApproverRows(prev => [...prev, { name: approverSearchQuery.split('@')[0], email: approverSearchQuery.trim() }])
-                                setApproverSearchQuery('')
-                                setShowApproverSearch(false)
-                              } else {
-                                setApproverRows(prev => [...prev, { name: approverSearchQuery.trim(), email: '' }])
-                                setApproverSearchQuery('')
-                                setShowApproverSearch(false)
-                              }
-                            }
-                          }}
-                          className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
-                        >
-                          NUOVO
-                        </button>
-                      </div>
-
-                      {/* Search results from contacts */}
-                      {approverSearchQuery.trim().length > 0 && (
-                        <div className="mt-2 max-h-36 overflow-y-auto space-y-1">
-                          {contacts
-                            .filter(c =>
-                              c.name.toLowerCase().includes(approverSearchQuery.toLowerCase()) ||
-                              (c.email && c.email.toLowerCase().includes(approverSearchQuery.toLowerCase()))
-                            )
-                            .filter(c => !approverRows.some(a => a.name === c.name && a.email === c.email))
-                            .slice(0, 8)
-                            .map(contact => {
-                              const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
-                              return (
-                                <button
-                                  key={contact.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setApproverRows(prev => [...prev, { name: contact.name, email: hasRealEmail ? contact.email : '' }])
-                                    setApproverSearchQuery('')
-                                    setShowApproverSearch(false)
-                                  }}
-                                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors text-left"
-                                >
-                                  <div className="w-7 h-7 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-                                    <span className="text-amber-700 font-bold text-[10px]">
-                                      {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                                    </span>
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                                    <p className="text-xs text-gray-400 truncate">
-                                      {hasRealEmail ? contact.email : contact.phone || ''}
-                                    </p>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          {contacts.filter(c =>
-                            c.name.toLowerCase().includes(approverSearchQuery.toLowerCase()) ||
-                            (c.email && c.email.toLowerCase().includes(approverSearchQuery.toLowerCase()))
-                          ).filter(c => !approverRows.some(a => a.name === c.name && a.email === c.email)).length === 0 && (
-                            <p className="text-xs text-gray-400 text-center py-2">Nessun contatto trovato. Premi NUOVO per crearne uno.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {approverRows.length === 0 && !showApproverSearch && (
-                    <p className="text-xs text-gray-400">Nessun approvatore aggiunto</p>
                   )}
                 </div>
               )}

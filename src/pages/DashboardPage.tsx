@@ -35,7 +35,7 @@ async function convertFileToPdf(file: File): Promise<File> {
     page.drawImage(img, { x: (a4W - w) / 2, y: a4H - margin - h, width: w, height: h })
     const pdfBytes = await pdfDoc.save()
     const pdfName = file.name.replace(/\.[^.]+$/, '.pdf')
-    return new File([pdfBytes.buffer], pdfName, { type: 'application/pdf' })
+    return new File([new Blob([pdfBytes])], pdfName, { type: 'application/pdf' })
   }
 
   // Other formats (docx, doc, odt, etc.) → convert via Netlify function

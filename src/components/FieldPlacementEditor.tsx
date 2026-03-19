@@ -529,16 +529,16 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
                   return (
                     <div
                       key={field.tempId}
-                      className={`absolute flex items-center gap-1 px-1.5 rounded-md border-2 transition-shadow text-xs font-medium truncate select-none ${
-                        isSelected ? 'ring-2 ring-offset-1 shadow-lg z-10' : 'shadow-sm z-[5]'
+                      className={`absolute flex items-center gap-1 px-1.5 rounded transition-shadow text-xs font-medium truncate select-none ${
+                        isSelected ? 'ring-1 ring-offset-1 shadow-md z-10' : 'z-[5]'
                       }`}
                       style={{
                         left: `${field.xPercent}%`,
                         top: `${field.yPercent}%`,
                         width: `${field.widthPercent}%`,
                         height: `${field.heightPercent}%`,
-                        backgroundColor: color.hex + '20',
-                        borderColor: color.hex,
+                        backgroundColor: color.hex + '12',
+                        border: `1px dashed ${color.hex}`,
                         color: color.hex,
                         cursor: 'grab',
                         '--tw-ring-color': color.hex,

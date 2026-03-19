@@ -253,14 +253,14 @@ export default function SignPage() {
     switch (field.field_type) {
       case 'signature':
         return (
-          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-700 font-medium cursor-default"
+          <div className="w-full h-full flex items-center justify-center bg-green-50/60 border border-dashed border-green-400 rounded text-green-700 font-medium cursor-default"
             style={{ fontFamily: "'Caveat', 'Dancing Script', cursive", fontSize: '14px' }}>
             {val as string || signerName || 'Firma'}
           </div>
         )
       case 'initials':
         return (
-          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-700 font-bold cursor-default"
+          <div className="w-full h-full flex items-center justify-center bg-green-50/60 border border-dashed border-green-400 rounded text-green-700 font-bold cursor-default"
             style={{ fontFamily: "'Caveat', 'Dancing Script', cursive", fontSize: '13px', fontStyle: 'italic' }}>
             {val as string}
           </div>
@@ -290,7 +290,7 @@ export default function SignPage() {
             value={(val as string) || ''}
             onChange={e => updateFieldValue(field.id, e.target.value)}
             placeholder={field.placeholder || field.label || 'Inserisci testo'}
-            className="w-full h-full px-1 text-xs border border-gray-300 rounded bg-white focus:border-green-500 focus:outline-none"
+            className="w-full h-full px-1 text-xs border border-dashed border-gray-300 rounded bg-white focus:border-green-500 focus:border-solid focus:outline-none"
           />
         )
       case 'checkbox':

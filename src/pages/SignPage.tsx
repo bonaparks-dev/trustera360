@@ -99,7 +99,10 @@ export default function SignPage() {
               initialValues[f.id] = new Date().toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })
               break
             case 'signature':
-              initialValues[f.id] = '' // will be filled on sign
+              initialValues[f.id] = data.signerName || ''
+              break
+            case 'initials':
+              initialValues[f.id] = (data.signerName || '').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 3)
               break
             case 'checkbox':
               initialValues[f.id] = false
@@ -250,8 +253,16 @@ export default function SignPage() {
     switch (field.field_type) {
       case 'signature':
         return (
-          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-600 text-xs font-medium cursor-default">
-            {signerName || 'Firma'}
+          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-700 font-medium cursor-default"
+            style={{ fontFamily: "'Caveat', 'Dancing Script', cursive", fontSize: '14px' }}>
+            {val as string || signerName || 'Firma'}
+          </div>
+        )
+      case 'initials':
+        return (
+          <div className="w-full h-full flex items-center justify-center bg-green-50/80 border-2 border-dashed border-green-300 rounded text-green-700 font-bold cursor-default"
+            style={{ fontFamily: "'Caveat', 'Dancing Script', cursive", fontSize: '13px', fontStyle: 'italic' }}>
+            {val as string}
           </div>
         )
       case 'date':

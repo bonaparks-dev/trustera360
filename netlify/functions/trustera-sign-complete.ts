@@ -178,24 +178,42 @@ async function buildSignedPdf(
           page.drawText('✓', { x: x + 2, y: y + 2, size: 12, font: boldFont, color: rgb(0.09, 0.64, 0.27) })
         }
       } else if (entry.field_type === 'signature' || entry.field_type === 'initials') {
-        // Draw YouSign-style signature box: thin gray border + name
-        page.drawRectangle({
-          x, y, width: fieldW, height: fieldH,
-          borderColor: rgb(0.82, 0.82, 0.82),
-          borderWidth: 0.5,
-          color: rgb(1, 1, 1),
-        })
         const textValue = typeof entry.value === 'string' && entry.value ? entry.value : signers[0]?.name || ''
-        const fontSize = entry.field_type === 'initials' ? 11 : 14
-        page.drawText(textValue, {
-          x: x + 4, y: y + fieldH / 2 - fontSize / 3,
-          size: fontSize, font: boldFont, color: rgb(0.1, 0.1, 0.1)
-        })
-        // "Certificato da Trustera" inside box bottom
-        page.drawText('Certificato da Trustera', {
-          x: x + 4, y: y + 3,
-          size: 5, font, color: rgb(0.6, 0.6, 0.6)
-        })
+        const signerData = signers[0] || { name: textValue, signed_at: new Date().toISOString() }
+        const signDate = new Date(signerData.signed_at)
+        const dateStr = signDate.toLocaleString('it-IT', { timeZone: 'Europe/Rome', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+        if (entry.field_type === 'initials') {
+          // Initials: simple box with text
+          page.drawRectangle({
+            x, y, width: fieldW, height: fieldH,
+            borderColor: rgb(0.09, 0.55, 0.27), borderWidth: 0.75,
+            color: rgb(1, 1, 1),
+          })
+          page.drawText(textValue, {
+            x: x + 4, y: y + fieldH / 2 - 4,
+            size: 11, font: boldFont, color: rgb(0.1, 0.1, 0.1)
+          })
+        } else {
+          // Signature: PAdES-style stamp with green border
+          const stampH = Math.max(fieldH, 45)
+          const stampW = Math.max(fieldW, 160)
+          page.drawRectangle({
+            x, y: y + fieldH - stampH, width: stampW, height: stampH,
+            borderColor: rgb(0.09, 0.55, 0.27), borderWidth: 1,
+            color: rgb(1, 1, 1),
+          })
+          const lx = x + 5
+          const ly = y + fieldH - 10
+          const lineH = 9
+          const green = rgb(0.09, 0.55, 0.27)
+          const gray = rgb(0.3, 0.3, 0.3)
+          page.drawText('Firmato da:', { x: lx, y: ly, size: 7, font, color: green })
+          page.drawText(textValue, { x: lx + font.widthOfTextAtSize('Firmato da: ', 7), y: ly, size: 7, font: boldFont, color: gray })
+          page.drawText(`Motivo: Firma digitale - ${documentName}`, { x: lx, y: ly - lineH, size: 6.5, font, color: gray })
+          page.drawText('Certificato da: Trustera', { x: lx, y: ly - lineH * 2, size: 6.5, font, color: gray })
+          page.drawText(`Data: ${dateStr}`, { x: lx, y: ly - lineH * 3, size: 6.5, font, color: gray })
+        }
       } else if (typeof entry.value === 'string' && entry.value) {
         // Date, name, email, text, label, readonly — all rendered as text
         page.drawText(entry.value, { x: x + 2, y: y + fieldH / 2 - 3, size: 9, font, color: rgb(0.15, 0.15, 0.15) })

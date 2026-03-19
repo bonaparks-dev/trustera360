@@ -186,19 +186,6 @@ async function buildSignedPdf(
     }
   }
 
-  // Add footer with signer names + "Certificato da Trustera" on ALL existing pages
-  const existingPages = pdfDoc.getPages()
-  const signerNamesList = signers.map(s => s.name).join(', ')
-  for (const existingPage of existingPages) {
-    const { width } = existingPage.getSize()
-    existingPage.drawText(`Firmato da: ${signerNamesList}`, {
-      x: 50, y: 20, size: 7, font, color: rgb(0.4, 0.4, 0.4)
-    })
-    existingPage.drawText('Certificato da Trustera', {
-      x: width - 150, y: 20, size: 7, font, color: rgb(0.09, 0.64, 0.27)
-    })
-  }
-
   // Add small QR code to the bottom-right corner of the last page
   const verifyUrl = `https://trustera360.app/verify/${originalHash}`
   const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 120, margin: 0 })

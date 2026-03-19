@@ -126,7 +126,6 @@ export default function VerifyPage() {
             </svg>
           </div>
           <h1 className="text-xl font-bold text-white">Documento Verificato</h1>
-          <p className="text-green-100 text-sm mt-1">Certificato da Trustera</p>
         </div>
 
         {/* Content */}

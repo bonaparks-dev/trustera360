@@ -206,7 +206,7 @@ async function buildSignedPdf(
 
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
-  const qrSize = 28 // ~1cm at 72 DPI
+  const qrSize = 14.17 // 59x59px at 300 DPI = ~0.5cm
   const margin = 15
   lastPage.drawImage(qrImage, {
     x: lastW - qrSize - margin,

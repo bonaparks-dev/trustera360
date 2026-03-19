@@ -536,11 +536,11 @@ export default function DashboardPage({ session }: { session: Session }) {
   }
 
   function getContactSuggestions(query: string, currentIndex: number): Contact[] {
-    if (query.length < 1) return []
-    const q = query.toLowerCase()
+    const q = query.toLowerCase().trim()
     return contacts.filter(c => {
       const usedByOther = signerRows.some((s, i) => i !== currentIndex && s.email && c.email && s.email.toLowerCase() === c.email.toLowerCase())
       if (usedByOther) return false
+      if (!q) return true
       return c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q)
     }).slice(0, 5)
   }
@@ -2189,7 +2189,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                             placeholder="Nome e Cognome"
                             className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
                           />
-                          {focusedSignerField?.index === i && focusedSignerField?.field === 'name' && signer.name.trim().length > 0 && (() => {
+                          {focusedSignerField?.index === i && focusedSignerField?.field === 'name' && (() => {
                             const suggestions = getContactSuggestions(signer.name, i)
                             if (suggestions.length === 0) return null
                             return (

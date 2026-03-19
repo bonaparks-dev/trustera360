@@ -97,20 +97,30 @@ function cleanPhoneForChatId(phone: string): string {
 async function sendWhatsAppPdf(phone: string, publicUrl: string, documentName: string, signerName: string): Promise<void> {
   const idInstance = process.env.GREEN_API_INSTANCE_ID
   const apiToken = process.env.GREEN_API_TOKEN
-  if (!idInstance || !apiToken) return
+  if (!idInstance || !apiToken) {
+    console.warn('[trustera-sign-complete] GREEN_API credentials missing, cannot send WhatsApp PDF')
+    return
+  }
 
   const chatId = cleanPhoneForChatId(phone) + '@c.us'
+  console.log('[trustera-sign-complete] Sending WhatsApp PDF to chatId:', chatId, 'url:', publicUrl)
   try {
-    await fetch(`https://api.green-api.com/waInstance${idInstance}/sendFileByUrl/${apiToken}`, {
+    const res = await fetch(`https://api.green-api.com/waInstance${idInstance}/sendFileByUrl/${apiToken}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chatId,
         urlFile: publicUrl,
-        fileName: `${documentName}_firmato.pdf`,
+        fileName: `${documentName.replace(/[^a-zA-Z0-9._-]/g, '_')}_firmato.pdf`,
         caption: `Documento firmato: ${documentName}\nFirmato da: ${signerName}\n\nTrustera - Infrastructure for Digital Trust`
       })
     })
+    const data = await res.json()
+    if (res.ok && data.idMessage) {
+      console.log('[trustera-sign-complete] WhatsApp PDF sent successfully:', data.idMessage)
+    } else {
+      console.warn('[trustera-sign-complete] WhatsApp PDF response not OK:', JSON.stringify(data))
+    }
   } catch (err: any) {
     console.warn('[trustera-sign-complete] WhatsApp PDF send failed for', phone, ':', err.message)
   }
@@ -505,11 +515,19 @@ export const handler: Handler = async (event) => {
 
       // Send signed PDF to each signer via the channel chosen by the sender
       for (const s of allSigners) {
-        const channel = (s as any).notification_channel || 'email'
-        if (channel === 'whatsapp' && s.signer_phone) {
-          await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
-        } else {
-          await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, signedPdfBuffer, false)
+        try {
+          const channel = (s as any).notification_channel || 'email'
+          if (channel === 'whatsapp' && s.signer_phone) {
+            console.log('[trustera-sign-complete] Sending signed PDF via WhatsApp to:', s.signer_phone)
+            await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
+          } else if (s.signer_email) {
+            console.log('[trustera-sign-complete] Sending signed PDF via email to:', s.signer_email)
+            await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, signedPdfBuffer, false)
+          } else {
+            console.warn('[trustera-sign-complete] Signer has no email or phone, skipping:', s.signer_name)
+          }
+        } catch (sendErr: any) {
+          console.error('[trustera-sign-complete] Failed to send signed PDF to signer:', s.signer_name, sendErr.message)
         }
       }
 
@@ -704,7 +722,7 @@ export const handler: Handler = async (event) => {
     const channel = doc.notification_channel || 'email'
     if (channel === 'whatsapp' && doc.signer_phone) {
       await sendWhatsAppPdf(doc.signer_phone, publicUrl, doc.name, doc.signer_name)
-    } else {
+    } else if (doc.signer_email) {
       await sendSignedPdfEmail(doc.signer_email, doc.name, doc.signer_name, signedPdfBuffer, false)
     }
 

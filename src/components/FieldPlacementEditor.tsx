@@ -526,49 +526,91 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
                 {fields.filter(f => f.pageNumber === pageNum).map(field => {
                   const color = SIGNER_COLORS[field.signerIndex % SIGNER_COLORS.length]
                   const isSelected = selectedFieldId === field.tempId
+                  const isSignature = field.fieldType === 'signature' || field.fieldType === 'initials'
+                  const signerName = signers[field.signerIndex]?.name || 'Firmatario'
+                  const signerInitials = signerName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
                   return (
                     <div
                       key={field.tempId}
-                      className={`absolute flex items-center gap-1 px-1.5 rounded transition-shadow text-xs font-medium truncate select-none ${
-                        isSelected ? 'ring-1 ring-offset-1 shadow-md z-10' : 'z-[5]'
-                      }`}
+                      className="absolute select-none"
                       style={{
                         left: `${field.xPercent}%`,
                         top: `${field.yPercent}%`,
                         width: `${field.widthPercent}%`,
                         height: `${field.heightPercent}%`,
-                        backgroundColor: color.hex + '12',
-                        border: `1px dashed ${color.hex}`,
-                        color: color.hex,
-                        cursor: 'grab',
-                        '--tw-ring-color': color.hex,
-                      } as any}
-                      onClick={e => { e.stopPropagation(); setSelectedFieldId(field.tempId) }}
-                      onDoubleClick={e => { e.stopPropagation(); setEditingFieldId(field.tempId) }}
-                      onMouseDown={e => handleFieldMouseDown(e, field.tempId, pageNum)}
-                      onTouchStart={e => handleFieldMouseDown(e, field.tempId, pageNum)}
+                        zIndex: isSelected ? 10 : 5,
+                      }}
                     >
-                      <FieldIcon type={field.fieldType} className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span
-                        className="truncate"
-                        style={field.fieldType === 'signature' || field.fieldType === 'initials' ? {
-                          fontFamily: getFontCss(field.fontStyle),
-                          fontSize: field.fontSize ? `${Math.min(field.fontSize, 14)}px` : undefined,
-                          fontStyle: field.fieldType === 'initials' ? 'italic' : undefined,
-                        } : undefined}
-                      >
-                        {field.defaultValue || field.label || FIELD_TYPES[field.fieldType].label}
-                      </span>
-
-                      {/* Delete button when selected */}
+                      {/* Toolbar on top when selected */}
                       {isSelected && (
-                        <button
-                          onClick={e => { e.stopPropagation(); deleteField(field.tempId) }}
-                          className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 shadow z-20"
-                        >
-                          ×
-                        </button>
+                        <div className="absolute -top-9 left-0 flex items-center gap-1 bg-gray-900 rounded-lg px-2 py-1.5 shadow-lg whitespace-nowrap" style={{ zIndex: 20 }}>
+                          <div className="w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold text-white flex-shrink-0" style={{ backgroundColor: color.hex }}>
+                            {signerInitials}
+                          </div>
+                          <span className="text-[11px] font-medium text-white truncate max-w-[100px]">{signerName.toUpperCase()}</span>
+                          <div className="w-px h-4 bg-gray-600 mx-0.5" />
+                          <button onClick={e => { e.stopPropagation(); setEditingFieldId(field.tempId) }}
+                            className="w-6 h-6 flex items-center justify-center text-white hover:bg-gray-700 rounded transition-colors" title="Modifica">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg>
+                          </button>
+                          <button onClick={e => { e.stopPropagation(); deleteField(field.tempId) }}
+                            className="w-6 h-6 flex items-center justify-center text-white hover:bg-red-600 rounded transition-colors" title="Elimina">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                          </button>
+                        </div>
                       )}
+
+                      {/* Resize handle bottom-right when selected */}
+                      {isSelected && (
+                        <div className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 rounded-full cursor-se-resize" style={{ borderColor: color.hex, zIndex: 20 }} />
+                      )}
+
+                      {/* Field box */}
+                      <div
+                        className={`w-full h-full rounded cursor-grab ${isSelected ? 'shadow-md' : ''}`}
+                        style={isSignature ? {
+                          backgroundColor: '#ffffff',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '6px',
+                          boxShadow: isSelected ? `0 0 0 1px ${color.hex}` : undefined,
+                        } : {
+                          backgroundColor: color.hex + '12',
+                          border: `1px dashed ${color.hex}80`,
+                          boxShadow: isSelected ? `0 0 0 1px ${color.hex}` : undefined,
+                        }}
+                        onClick={e => { e.stopPropagation(); setSelectedFieldId(field.tempId) }}
+                        onDoubleClick={e => { e.stopPropagation(); setEditingFieldId(field.tempId) }}
+                        onMouseDown={e => handleFieldMouseDown(e, field.tempId, pageNum)}
+                        onTouchStart={e => handleFieldMouseDown(e, field.tempId, pageNum)}
+                      >
+                        {isSignature ? (
+                          /* Signature / Initials: YouSign-style box */
+                          <div className="w-full h-full flex flex-col items-center justify-center px-2 overflow-hidden">
+                            <span className="text-gray-800 truncate w-full text-center" style={{
+                              fontFamily: getFontCss(field.fontStyle),
+                              fontSize: `${Math.min(field.fontSize || 22, 20)}px`,
+                              fontStyle: field.fieldType === 'initials' ? 'italic' : 'italic',
+                              fontWeight: 500,
+                            }}>
+                              {field.fieldType === 'initials'
+                                ? signerInitials
+                                : (field.defaultValue || signerName).toUpperCase()}
+                            </span>
+                            <span className="text-[7px] text-gray-400 flex items-center gap-0.5 mt-0.5">
+                              <svg className="w-2 h-2" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                              Certificato da Trustera
+                            </span>
+                          </div>
+                        ) : (
+                          /* Non-signature: icon + label */
+                          <div className="w-full h-full flex items-center gap-1 px-1.5 text-xs font-medium truncate" style={{ color: color.hex }}>
+                            <FieldIcon type={field.fieldType} className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="truncate">
+                              {field.defaultValue || field.label || FIELD_TYPES[field.fieldType].label}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

@@ -186,18 +186,19 @@ async function buildSignedPdf(
     }
   }
 
-  // Add small QR code to the bottom-right corner of the last page
+  // Add QR code to the bottom-right corner of the last page
   const verifyUrl = `https://trustera360.app/verify/${originalHash}`
-  const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 120, margin: 0 })
+  const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 200, margin: 1 })
   const qrImage = await pdfDoc.embedPng(qrPng)
 
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
-  const qrSize = 14.17 // 59x59px at 300 DPI = ~0.5cm
-  const margin = 15
+  const qrSize = 28 // ~1cm
+  const qrMargin = 20
+  // Place QR in bottom-right, above page edge
   lastPage.drawImage(qrImage, {
-    x: lastW - qrSize - margin,
-    y: margin,
+    x: lastW - qrSize - qrMargin,
+    y: qrMargin,
     width: qrSize,
     height: qrSize,
   })

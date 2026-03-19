@@ -483,7 +483,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
             </div>
           )}
 
-          <Document
+          {pdfBlobUrl && <Document
             file={pdfBlobUrl}
             onLoadSuccess={onDocumentLoadSuccess}
             loading=""
@@ -563,7 +563,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
                 })}
               </div>
             ))}
-          </Document>
+          </Document>}
         </div>
       </div>
 

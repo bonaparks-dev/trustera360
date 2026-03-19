@@ -539,8 +539,9 @@ export default function DashboardPage({ session }: { session: Session }) {
     if (query.length < 1) return []
     const q = query.toLowerCase()
     return contacts.filter(c => {
-      const usedByOther = signerRows.some((s, i) => i !== currentIndex && s.email.toLowerCase() === c.email.toLowerCase())
-      return !usedByOther && (c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q))
+      const usedByOther = signerRows.some((s, i) => i !== currentIndex && s.email && c.email && s.email.toLowerCase() === c.email.toLowerCase())
+      if (usedByOther) return false
+      return c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q)
     }).slice(0, 5)
   }
 
@@ -2177,14 +2178,50 @@ export default function DashboardPage({ session }: { session: Session }) {
                           </div>
                         )}
 
-                        {/* Name */}
-                        <input
-                          type="text"
-                          value={signer.name}
-                          onChange={e => updateSignerRow(i, 'name', e.target.value)}
-                          placeholder="Nome e Cognome"
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                        />
+                        {/* Name with contact autocomplete */}
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={signer.name}
+                            onChange={e => updateSignerRow(i, 'name', e.target.value)}
+                            onFocus={() => setFocusedSignerField({ index: i, field: 'name' })}
+                            onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
+                            placeholder="Nome e Cognome"
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                          />
+                          {focusedSignerField?.index === i && focusedSignerField?.field === 'name' && signer.name.trim().length > 0 && (() => {
+                            const suggestions = getContactSuggestions(signer.name, i)
+                            if (suggestions.length === 0) return null
+                            return (
+                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
+                                {suggestions.map(contact => (
+                                  <button
+                                    key={contact.id}
+                                    type="button"
+                                    onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
+                                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                                  >
+                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                      <span className="text-xs font-bold text-gray-500">
+                                        {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                      </span>
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                                      <p className="text-xs text-gray-400 truncate">{(() => {
+                                        const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
+                                        if (hasRealEmail && contact.phone) return `${contact.email} · ${contact.phone}`
+                                        if (hasRealEmail) return contact.email
+                                        if (contact.phone) return contact.phone
+                                        return ''
+                                      })()}</p>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )
+                          })()}
+                        </div>
                       </div>
                     ))}
                   </div>

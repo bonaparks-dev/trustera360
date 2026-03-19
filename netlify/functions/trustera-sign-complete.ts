@@ -179,29 +179,68 @@ async function buildSignedPdf(
         // Draw signer name in bold as "signature"
         const textValue = typeof entry.value === 'string' && entry.value ? entry.value : signers[0]?.name || ''
         page.drawText(textValue, { x: x + 4, y: y + 6, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
-        page.drawText('Certificato da Trustera', { x: x + 4, y: y - 4, size: 6, font, color: rgb(0.09, 0.64, 0.27) })
       } else if (typeof entry.value === 'string' && entry.value) {
         page.drawText(entry.value, { x: x + 2, y: y + 4, size: 9, font, color: rgb(0.15, 0.15, 0.15) })
       }
     }
   }
 
-  // Add QR code to the bottom-right corner of the last page
+  // Add centered footer on last page: QR + "✓ Certificato da" + Trustera logo
   const verifyUrl = `https://trustera360.app/verify/${originalHash}`
   const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 200, margin: 1 })
   const qrImage = await pdfDoc.embedPng(qrPng)
 
+  // Embed Trustera logo
+  let logoImage: any = null
+  try {
+    const logoResp = await fetch('https://trustera360.app/trustera-logo.jpeg')
+    if (logoResp.ok) {
+      const logoBytes = new Uint8Array(await logoResp.arrayBuffer())
+      logoImage = await pdfDoc.embedJpg(logoBytes)
+    }
+  } catch (e) {
+    console.warn('[buildSignedPdf] Could not embed logo:', e)
+  }
+
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
-  const qrSize = 28 // ~1cm
-  const qrMargin = 20
-  // Place QR in bottom-right, above page edge
+  const qrSize = 28
+  const logoH = 10
+  const logoW = logoImage ? (logoImage.width / logoImage.height) * logoH : 40
+  const checkText = '✓  Certificato da'
+  const checkTextW = font.widthOfTextAtSize(checkText, 8)
+  const gap = 6
+  // Total width: QR + gap + checkText + gap + logo
+  const totalW = qrSize + gap + checkTextW + gap + (logoImage ? logoW : 0)
+  const startX = (lastW - totalW) / 2
+  const footerY = 15
+
+  // QR code
   lastPage.drawImage(qrImage, {
-    x: lastW - qrSize - qrMargin,
-    y: qrMargin,
+    x: startX,
+    y: footerY - 2,
     width: qrSize,
     height: qrSize,
   })
+
+  // "✓ Certificato da" text — vertically centered with QR
+  lastPage.drawText(checkText, {
+    x: startX + qrSize + gap,
+    y: footerY + qrSize / 2 - 3,
+    size: 8,
+    font,
+    color: rgb(0.09, 0.64, 0.27),
+  })
+
+  // Trustera logo
+  if (logoImage) {
+    lastPage.drawImage(logoImage, {
+      x: startX + qrSize + gap + checkTextW + gap,
+      y: footerY + qrSize / 2 - logoH / 2,
+      width: logoW,
+      height: logoH,
+    })
+  }
 
   return pdfDoc.save()
 }

@@ -99,6 +99,7 @@ interface SignerRow {
   phone: string
   countryCode: string
   channel: 'email' | 'whatsapp'
+  mode: 'contact' | 'new'
 }
 
 type SidebarSection = 'documenti' | 'contatti'
@@ -272,7 +273,7 @@ export default function DashboardPage({ session }: { session: Session }) {
   const [uploading, setUploading] = useState(false)
   const [converting, setConverting] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email' }])
+  const [signerRows, setSignerRows] = useState<SignerRow[]>([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email', mode: 'contact' }])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Scheduled send
@@ -447,7 +448,7 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   // ── Modal state ──
   const [signerCount, setSignerCount] = useState(0) // 0 = not yet chosen
-  const [focusedSignerField, setFocusedSignerField] = useState<{ index: number; field: 'email' | 'name' } | null>(null)
+  const [_focusedSignerField, setFocusedSignerField] = useState<{ index: number; field: 'email' | 'name' } | null>(null)
   const [useOtp, setUseOtp] = useState(false)
   const [approverRows, setApproverRows] = useState<{ name: string; email: string }[]>([])
   const [showApproverSearch, setShowApproverSearch] = useState(false)
@@ -483,12 +484,13 @@ export default function DashboardPage({ session }: { session: Session }) {
         phone: s.phone || '',
         countryCode: s.countryCode || '+39',
         channel: s.channel || 'email',
+        mode: s.name ? 'contact' as const : 'contact' as const,
       }))
       setSignerCount(rows.length)
       setSignerRows(rows)
     } else {
       setSignerCount(1)
-      setSignerRows([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email' }])
+      setSignerRows([{ name: '', email: '', phone: '', countryCode: '+39', channel: 'email', mode: 'contact' }])
     }
     setShowUploadModal(true)
   }
@@ -501,7 +503,7 @@ export default function DashboardPage({ session }: { session: Session }) {
       if (count > prev.length) {
         // Add new empty rows
         return [...prev, ...Array.from({ length: count - prev.length }, () => ({
-          name: '', email: '', phone: '', countryCode: '+39', channel: 'email' as const
+          name: '', email: '', phone: '', countryCode: '+39', channel: 'email' as const, mode: 'contact' as const
         }))]
       }
       // Trim extra rows
@@ -530,7 +532,8 @@ export default function DashboardPage({ session }: { session: Session }) {
       email: contact.email,
       phone: phoneNum,
       countryCode,
-      channel: contact.phone ? 'whatsapp' : 'email'
+      channel: contact.phone ? 'whatsapp' : 'email',
+      mode: 'contact'
     } : r))
     setFocusedSignerField(null)
   }
@@ -2091,137 +2094,158 @@ export default function DashboardPage({ session }: { session: Session }) {
                     {/* Step 2+3: For each signer — channel, then email (with autocomplete), name, phone */}
                     {signerRows.map((signer, i) => (
                       <div key={i} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50 space-y-3">
-                        <p className="text-[13px] font-semibold text-gray-700">Firmatario {i + 1}</p>
-
-                        {/* Channel toggle */}
-                        <div className="flex gap-2">
-                          <button type="button" onClick={() => updateSignerRow(i, 'channel', 'email')}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${signer.channel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                          >Email</button>
-                          <button type="button" onClick={() => updateSignerRow(i, 'channel', 'whatsapp')}
-                            className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-all ${signer.channel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                          >WhatsApp</button>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[13px] font-semibold text-gray-700">Firmatario {i + 1}</p>
+                          {signer.name && signer.mode === 'contact' && (
+                            <button type="button" onClick={() => setSignerRows(prev => prev.map((r, idx) => idx === i ? { ...r, name: '', email: '', phone: '', mode: 'contact' } : r))}
+                              className="text-xs text-gray-400 hover:text-red-500 transition-colors">Cambia</button>
+                          )}
                         </div>
 
-                        {/* Email or Phone based on channel */}
-                        {signer.channel === 'email' ? (
-                          /* Email with autocomplete */
-                          <div className="relative">
-                            <input
-                              type="email"
-                              value={signer.email}
-                              onChange={e => updateSignerRow(i, 'email', e.target.value)}
-                              onFocus={() => setFocusedSignerField({ index: i, field: 'email' })}
-                              onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
-                              placeholder="email@esempio.com"
-                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                            />
-                            {focusedSignerField?.index === i && focusedSignerField?.field === 'email' && (() => {
-                              const suggestions = getContactSuggestions(signer.email, i)
-                              if (suggestions.length === 0) return null
-                              return (
-                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
-                                  {suggestions.map(contact => (
-                                    <button
-                                      key={contact.id}
-                                      type="button"
-                                      onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
-                                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
-                                    >
-                                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-xs font-bold text-gray-500">
-                                          {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                                        </span>
-                                      </div>
-                                      <div className="min-w-0">
-                                        <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                                        <p className="text-xs text-gray-400 truncate">{(() => {
-                                          const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
-                                          if (hasRealEmail && contact.phone) return `${contact.email} · ${contact.phone}`
-                                          if (hasRealEmail) return contact.email
-                                          if (contact.phone) return contact.phone
-                                          return ''
-                                        })()}</p>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              )
-                            })()}
-                          </div>
-                        ) : (
-                          /* WhatsApp: phone with country code dropdown */
-                          <div className="flex gap-2">
-                            <div className="relative flex-shrink-0">
-                              <select
-                                value={signer.countryCode}
-                                onChange={e => updateSignerRow(i, 'countryCode', e.target.value)}
-                                className="appearance-none border border-gray-200 rounded-xl pl-3 pr-8 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20 w-[110px]"
-                              >
-                                {COUNTRY_CODES.map((cc, ci) => (
-                                  <option key={`${cc.code}-${ci}`} value={cc.code}>
-                                    {cc.flag} {cc.code}
-                                  </option>
-                                ))}
-                              </select>
-                              <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
-                              </svg>
+                        {/* Mode: Contact selection or manual entry */}
+                        {!signer.name ? (
+                          <>
+                            {/* Contatto / Nuovo toggle */}
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => updateSignerRow(i, 'mode', 'contact')}
+                                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${signer.mode === 'contact' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                              >Contatto</button>
+                              <button type="button" onClick={() => updateSignerRow(i, 'mode', 'new')}
+                                className={`flex-1 py-2 rounded-xl text-sm font-medium transition-all ${signer.mode === 'new' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                              >Nuovo</button>
                             </div>
-                            <input
-                              type="tel"
-                              value={signer.phone}
-                              onChange={e => updateSignerRow(i, 'phone', e.target.value.replace(/[^\d\s]/g, ''))}
-                              placeholder="347 1234567"
-                              className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                            />
+
+                            {signer.mode === 'contact' ? (
+                              /* Contact search + list */
+                              <div>
+                                <div className="relative mb-2">
+                                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                                  </svg>
+                                  <input
+                                    type="text"
+                                    value={signer.email}
+                                    onChange={e => updateSignerRow(i, 'email', e.target.value)}
+                                    placeholder="Cerca contatto..."
+                                    className="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500"
+                                  />
+                                </div>
+                                {(() => {
+                                  const suggestions = getContactSuggestions(signer.email, i)
+                                  if (suggestions.length === 0 && !signer.email) {
+                                    return <p className="text-xs text-gray-400 text-center py-2">Nessun contatto</p>
+                                  }
+                                  if (suggestions.length === 0) {
+                                    return <p className="text-xs text-gray-400 text-center py-2">Nessun risultato</p>
+                                  }
+                                  return (
+                                    <div className="border border-gray-100 rounded-xl overflow-hidden max-h-[200px] overflow-y-auto">
+                                      {suggestions.map(contact => (
+                                        <button
+                                          key={contact.id}
+                                          type="button"
+                                          onClick={() => applyContactToSigner(i, contact)}
+                                          className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
+                                        >
+                                          <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-xs font-bold text-green-600">
+                                              {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                            </span>
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
+                                            <p className="text-xs text-gray-400 truncate">{(() => {
+                                              const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
+                                              if (hasRealEmail && contact.phone) return `${contact.email} · ${contact.phone}`
+                                              if (hasRealEmail) return contact.email
+                                              if (contact.phone) return contact.phone
+                                              return ''
+                                            })()}</p>
+                                          </div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            ) : (
+                              /* New: manual entry form */
+                              <>
+                                {/* Channel toggle */}
+                                <div className="flex gap-2">
+                                  <button type="button" onClick={() => updateSignerRow(i, 'channel', 'email')}
+                                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${signer.channel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                  >Email</button>
+                                  <button type="button" onClick={() => updateSignerRow(i, 'channel', 'whatsapp')}
+                                    className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${signer.channel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                  >WhatsApp</button>
+                                </div>
+                                <input
+                                  type="text"
+                                  value={signer.name}
+                                  onChange={e => updateSignerRow(i, 'name', e.target.value)}
+                                  placeholder="Nome e Cognome"
+                                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                                />
+                                {signer.channel === 'email' ? (
+                                  <input
+                                    type="email"
+                                    value={signer.email}
+                                    onChange={e => updateSignerRow(i, 'email', e.target.value)}
+                                    placeholder="email@esempio.com"
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
+                                  />
+                                ) : (
+                                  <div className="flex gap-2">
+                                    <div className="relative flex-shrink-0">
+                                      <select
+                                        value={signer.countryCode}
+                                        onChange={e => updateSignerRow(i, 'countryCode', e.target.value)}
+                                        className="appearance-none border border-gray-200 rounded-xl pl-3 pr-8 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 w-[110px]"
+                                      >
+                                        {COUNTRY_CODES.map((cc, ci) => (
+                                          <option key={`${cc.code}-${ci}`} value={cc.code}>
+                                            {cc.flag} {cc.code}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                                      </svg>
+                                    </div>
+                                    <input
+                                      type="tel"
+                                      value={signer.phone}
+                                      onChange={e => updateSignerRow(i, 'phone', e.target.value.replace(/[^\d\s]/g, ''))}
+                                      placeholder="347 1234567"
+                                      className="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500"
+                                    />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          /* Selected contact summary */
+                          <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                            <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs font-bold text-green-600">
+                                {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                              </span>
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-gray-800 truncate">{signer.name}</p>
+                              <p className="text-xs text-gray-400 truncate">
+                                {signer.channel === 'whatsapp' && signer.phone
+                                  ? `WhatsApp · ${signer.countryCode}${signer.phone}`
+                                  : signer.email || ''}
+                              </p>
+                            </div>
+                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${signer.channel === 'whatsapp' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
+                              {signer.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                            </span>
                           </div>
                         )}
-
-                        {/* Name with contact autocomplete */}
-                        <div className="relative">
-                          <input
-                            type="text"
-                            value={signer.name}
-                            onChange={e => updateSignerRow(i, 'name', e.target.value)}
-                            onFocus={() => setFocusedSignerField({ index: i, field: 'name' })}
-                            onBlur={() => setTimeout(() => setFocusedSignerField(null), 200)}
-                            placeholder="Nome e Cognome"
-                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-[15px] text-gray-800 bg-white focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-500/20"
-                          />
-                          {focusedSignerField?.index === i && focusedSignerField?.field === 'name' && (() => {
-                            const suggestions = getContactSuggestions(signer.name, i)
-                            if (suggestions.length === 0) return null
-                            return (
-                              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
-                                {suggestions.map(contact => (
-                                  <button
-                                    key={contact.id}
-                                    type="button"
-                                    onMouseDown={e => { e.preventDefault(); applyContactToSigner(i, contact) }}
-                                    className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors flex items-center gap-3 border-b border-gray-50 last:border-0"
-                                  >
-                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                      <span className="text-xs font-bold text-gray-500">
-                                        {contact.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                                      </span>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-medium text-gray-800 truncate">{contact.name}</p>
-                                      <p className="text-xs text-gray-400 truncate">{(() => {
-                                        const hasRealEmail = contact.email && !contact.email.includes('@noemail') && !/^\+?\d[\d\s]*$/.test(contact.email)
-                                        if (hasRealEmail && contact.phone) return `${contact.email} · ${contact.phone}`
-                                        if (hasRealEmail) return contact.email
-                                        if (contact.phone) return contact.phone
-                                        return ''
-                                      })()}</p>
-                                    </div>
-                                  </button>
-                                ))}
-                              </div>
-                            )
-                          })()}
-                        </div>
                       </div>
                     ))}
                   </div>

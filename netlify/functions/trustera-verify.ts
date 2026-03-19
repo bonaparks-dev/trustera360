@@ -20,12 +20,15 @@ export const handler: Handler = async (event) => {
     console.log('[trustera-verify] Looking up hash:', hash)
 
     // 1. Look up document by pdf_hash in trustera_documents
-    const { data: doc, error: docError } = await supabase
+    const { data: docs, error: docError } = await supabase
       .from('trustera_documents')
       .select('id, name, signed_at, pdf_hash, status')
       .eq('pdf_hash', hash)
       .eq('status', 'signed')
-      .maybeSingle()
+      .order('signed_at', { ascending: false })
+      .limit(1)
+
+    const doc = docs?.[0] || null
 
     if (docError) {
       console.error('[trustera-verify] trustera_documents lookup error:', docError.message)

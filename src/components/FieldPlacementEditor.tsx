@@ -37,10 +37,20 @@ interface PlacedField {
 
 // Font options for signature fields
 const FONT_STYLES = [
-  { value: 'handwriting', label: 'Handwriting', css: "'Caveat', 'Dancing Script', cursive" },
-  { value: 'serif', label: 'Serif', css: "'Georgia', 'Times New Roman', serif" },
-  { value: 'sans-serif', label: 'Sans-serif', css: "'Helvetica', 'Arial', sans-serif" },
-  { value: 'monospace', label: 'Monospace', css: "'Courier New', monospace" },
+  { value: 'caveat', label: 'Caveat', css: "'Caveat', cursive" },
+  { value: 'dancing', label: 'Dancing Script', css: "'Dancing Script', cursive" },
+  { value: 'inconsolata', label: 'Inconsolata', css: "'Inconsolata', monospace" },
+  { value: 'opensans', label: 'Open Sans', css: "'Open Sans', sans-serif" },
+  { value: 'lato', label: 'Lato', css: "'Lato', sans-serif" },
+  { value: 'raleway', label: 'Raleway', css: "'Raleway', sans-serif" },
+  { value: 'merriweather', label: 'Merriweather', css: "'Merriweather', serif" },
+  { value: 'garamond', label: 'EB Garamond', css: "'EB Garamond', serif" },
+  { value: 'comicneue', label: 'Comic Neue', css: "'Comic Neue', cursive" },
+  { value: 'monaco', label: 'Monaco', css: "'Monaco', 'Courier New', monospace" },
+  { value: 'helvetica', label: 'Helvetica', css: "'Helvetica Neue', 'Helvetica', 'Arial', sans-serif" },
+  { value: 'courier', label: 'Courier', css: "'Courier New', 'Courier', monospace" },
+  { value: 'times', label: 'Times', css: "'Times New Roman', 'Times', serif" },
+  { value: 'georgia', label: 'Georgia', css: "'Georgia', serif" },
 ]
 
 function getFontCss(style?: string) {
@@ -161,7 +171,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
       ...(fieldType === 'initials' && signer ? {
         defaultValue: signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 3),
       } : {}),
-      ...(fieldType === 'signature' ? { fontStyle: 'handwriting', fontSize: 18 } : {}),
+      ...(fieldType === 'signature' ? { fontStyle: 'caveat', fontSize: 18 } : {}),
       ...(fieldType === 'name' && signer ? { defaultValue: signer.name } : {}),
     }
     setFields(prev => [...prev, newField])
@@ -723,13 +733,17 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
 
                     {/* Font style */}
                     <div>
-                      <p className="text-sm font-semibold text-gray-800 mb-1.5">Stile font</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <p className="text-sm font-semibold text-gray-800 mb-1.5">Carattere</p>
+                      <div className="border border-gray-200 rounded-xl overflow-hidden max-h-[240px] overflow-y-auto">
                         {FONT_STYLES.map(fs => (
                           <button key={fs.value} onClick={() => updateField(field.tempId, { fontStyle: fs.value })}
-                            className={`px-3 py-2.5 rounded-xl border text-sm transition-all ${(field.fontStyle || 'handwriting') === fs.value ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
-                            <span style={{ fontFamily: fs.css }}>{field.fieldType === 'initials' ? sigInitials : sigName}</span>
-                            <span className="block text-[10px] text-gray-400 mt-0.5">{fs.label}</span>
+                            className={`w-full flex items-center justify-between px-4 py-3 text-left border-b border-gray-50 last:border-0 transition-colors ${(field.fontStyle || 'caveat') === fs.value ? 'bg-gray-50' : 'hover:bg-gray-50'}`}>
+                            <span style={{ fontFamily: fs.css }} className="text-base text-gray-800">{fs.label}</span>
+                            {(field.fontStyle || 'caveat') === fs.value && (
+                              <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                              </svg>
+                            )}
                           </button>
                         ))}
                       </div>

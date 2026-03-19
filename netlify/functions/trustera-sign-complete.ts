@@ -170,17 +170,35 @@ async function buildSignedPdf(
       const x = (entry.x_percent / 100) * width
       const y = height - (entry.y_percent / 100) * height - (entry.height_percent / 100) * height
 
+      const fieldW = (entry.width_percent / 100) * width
+      const fieldH = (entry.height_percent / 100) * height
+
       if (entry.field_type === 'checkbox') {
         if (entry.value === true) {
-          // Draw a checkmark
           page.drawText('✓', { x: x + 2, y: y + 2, size: 12, font: boldFont, color: rgb(0.09, 0.64, 0.27) })
         }
-      } else if (entry.field_type === 'signature') {
-        // Draw signer name in bold as "signature"
+      } else if (entry.field_type === 'signature' || entry.field_type === 'initials') {
+        // Draw YouSign-style signature box: thin gray border + name
+        page.drawRectangle({
+          x, y, width: fieldW, height: fieldH,
+          borderColor: rgb(0.82, 0.82, 0.82),
+          borderWidth: 0.5,
+          color: rgb(1, 1, 1),
+        })
         const textValue = typeof entry.value === 'string' && entry.value ? entry.value : signers[0]?.name || ''
-        page.drawText(textValue, { x: x + 4, y: y + 6, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+        const fontSize = entry.field_type === 'initials' ? 11 : 14
+        page.drawText(textValue, {
+          x: x + 4, y: y + fieldH / 2 - fontSize / 3,
+          size: fontSize, font: boldFont, color: rgb(0.1, 0.1, 0.1)
+        })
+        // "Certificato da Trustera" inside box bottom
+        page.drawText('Certificato da Trustera', {
+          x: x + 4, y: y + 3,
+          size: 5, font, color: rgb(0.6, 0.6, 0.6)
+        })
       } else if (typeof entry.value === 'string' && entry.value) {
-        page.drawText(entry.value, { x: x + 2, y: y + 4, size: 9, font, color: rgb(0.15, 0.15, 0.15) })
+        // Date, name, email, text, label, readonly — all rendered as text
+        page.drawText(entry.value, { x: x + 2, y: y + fieldH / 2 - 3, size: 9, font, color: rgb(0.15, 0.15, 0.15) })
       }
     }
   }

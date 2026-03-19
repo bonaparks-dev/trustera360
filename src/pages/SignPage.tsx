@@ -46,7 +46,7 @@ export default function SignPage() {
 
   // Fetch PDF as blob to avoid CORS issues with Supabase signed URLs
   useEffect(() => {
-    if (!pdfUrl || !hasFields) return
+    if (!pdfUrl) return
     let cancelled = false
     async function loadPdf() {
       try {
@@ -62,7 +62,7 @@ export default function SignPage() {
     }
     loadPdf()
     return () => { cancelled = true }
-  }, [pdfUrl, hasFields])
+  }, [pdfUrl])
 
   useEffect(() => {
     if (token) loadData()
@@ -371,61 +371,50 @@ export default function SignPage() {
           <p className="text-sm text-gray-500">Firmatario: {signerName}</p>
         </div>
 
-        {/* PDF viewer — react-pdf with field overlays when fields exist, otherwise Google Docs iframe */}
+        {/* PDF viewer — react-pdf with field overlays */}
         {pdfUrl && status !== 'signed' && (
-          hasFields ? (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-              <Document
-                file={pdfBlobUrl || pdfUrl}
-                onLoadSuccess={({ numPages: n }) => { setNumPages(n); setPdfReady(true) }}
-                loading={
-                  <div className="flex items-center justify-center py-20">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
-                  </div>
-                }
-                className="flex flex-col items-center"
-              >
-                {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
-                  <div key={pageNum} className="relative w-full">
-                    <Page
-                      pageNumber={pageNum}
-                      width={Math.min(650, window.innerWidth - 48)}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                    />
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+            <Document
+              file={pdfBlobUrl || pdfUrl}
+              onLoadSuccess={({ numPages: n }) => { setNumPages(n); setPdfReady(true) }}
+              loading={
+                <div className="flex items-center justify-center py-20">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+                </div>
+              }
+              className="flex flex-col items-center"
+            >
+              {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
+                <div key={pageNum} className="relative w-full">
+                  <Page
+                    pageNumber={pageNum}
+                    width={Math.min(650, window.innerWidth - 48)}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                  />
 
-                    {/* Field overlays for this page */}
-                    {pdfReady && fields
-                      .filter(f => f.page_number === pageNum)
-                      .map(field => (
-                        <div
-                          key={field.id}
-                          className="absolute"
-                          style={{
-                            left: `${field.x_percent}%`,
-                            top: `${field.y_percent}%`,
-                            width: `${field.width_percent}%`,
-                            height: `${field.height_percent}%`,
-                          }}
-                        >
-                          {renderFieldInput(field)}
-                        </div>
-                      ))
-                    }
-                  </div>
-                ))}
-              </Document>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
-              <iframe
-                src={`https://docs.google.com/gview?url=${encodeURIComponent(pdfUrl)}&embedded=true`}
-                className="w-full border-0"
-                style={{ height: '70vh', minHeight: '500px' }}
-                title="Documento"
-              />
-            </div>
-          )
+                  {/* Field overlays for this page */}
+                  {pdfReady && hasFields && fields
+                    .filter(f => f.page_number === pageNum)
+                    .map(field => (
+                      <div
+                        key={field.id}
+                        className="absolute"
+                        style={{
+                          left: `${field.x_percent}%`,
+                          top: `${field.y_percent}%`,
+                          width: `${field.width_percent}%`,
+                          height: `${field.height_percent}%`,
+                        }}
+                      >
+                        {renderFieldInput(field)}
+                      </div>
+                    ))
+                  }
+                </div>
+              ))}
+            </Document>
+          </div>
         )}
 
         {error && (

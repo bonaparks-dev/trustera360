@@ -196,22 +196,13 @@ async function buildSignedPdf(
 
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
-  const qrSize = 50
-  const margin = 20
+  const qrSize = 28 // ~1cm at 72 DPI
+  const margin = 15
   lastPage.drawImage(qrImage, {
     x: lastW - qrSize - margin,
     y: margin,
     width: qrSize,
     height: qrSize,
-  })
-  const verifyLabel = 'Verificato da Trustera'
-  const labelWidth = font.widthOfTextAtSize(verifyLabel, 6)
-  lastPage.drawText(verifyLabel, {
-    x: lastW - qrSize - margin + (qrSize - labelWidth) / 2,
-    y: margin - 8,
-    size: 6,
-    font,
-    color: rgb(0.4, 0.4, 0.4),
   })
 
   return pdfDoc.save()

@@ -4,15 +4,65 @@ import { useParams } from 'react-router-dom'
 interface SignerInfo {
   name: string
   email: string
+  phone: string
+  channel: string
   signed_at: string
   signing_ip: string
+  user_agent: string
+}
+
+interface AuditEvent {
+  action: string
+  email: string
+  ip: string
+  userAgent: string
+  timestamp: string
+  metadata: Record<string, any>
 }
 
 interface VerificationData {
   documentName: string
   signedAt: string
+  createdAt: string | null
   originalHash: string
+  senderName: string
   signers: SignerInfo[]
+  auditTrail: AuditEvent[]
+}
+
+function formatAction(action: string): string {
+  const map: Record<string, string> = {
+    otp_sent: 'OTP inviato',
+    otp_verified: 'OTP verificato',
+    document_opened: 'Documento aperto',
+    document_viewed: 'Documento visualizzato',
+    signature_applied: 'Firma applicata',
+    document_signed: 'Documento firmato',
+    signing_completed: 'Firma completata',
+    email_sent: 'Email inviata',
+    whatsapp_sent: 'WhatsApp inviato',
+  }
+  return map[action] || action.replace(/_/g, ' ')
+}
+
+function parseBrowser(ua: string): string {
+  if (!ua) return ''
+  if (ua.includes('Chrome') && !ua.includes('Edg')) return 'Chrome'
+  if (ua.includes('Firefox')) return 'Firefox'
+  if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari'
+  if (ua.includes('Edg')) return 'Edge'
+  if (ua.includes('Opera') || ua.includes('OPR')) return 'Opera'
+  return 'Browser'
+}
+
+function parseOS(ua: string): string {
+  if (!ua) return ''
+  if (ua.includes('Windows')) return 'Windows'
+  if (ua.includes('Mac OS')) return 'macOS'
+  if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS'
+  if (ua.includes('Android')) return 'Android'
+  if (ua.includes('Linux')) return 'Linux'
+  return ''
 }
 
 export default function VerifyPage() {
@@ -20,6 +70,7 @@ export default function VerifyPage() {
   const [data, setData] = useState<VerificationData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [showAuditTrail, setShowAuditTrail] = useState(false)
 
   useEffect(() => {
     if (!hash) { setError('Hash mancante'); setLoading(false); return }
@@ -61,6 +112,9 @@ export default function VerifyPage() {
     )
   }
 
+  const fmtDate = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'long', timeStyle: 'short' })
+  const fmtDateShort = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'medium' })
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
       <div className="bg-white rounded-2xl shadow-lg max-w-lg w-full overflow-hidden">
@@ -77,49 +131,132 @@ export default function VerifyPage() {
 
         {/* Content */}
         <div className="px-8 py-6 space-y-5">
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Documento</p>
-            <p className="text-gray-900 font-semibold">{data.documentName}</p>
+          {/* Document info */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Documento</p>
+              <p className="text-gray-900 font-semibold text-sm">{data.documentName}</p>
+            </div>
+            {data.senderName && (
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Inviato da</p>
+                <p className="text-gray-700 text-sm">{data.senderName}</p>
+              </div>
+            )}
           </div>
 
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Data firma</p>
-            <p className="text-gray-700">
-              {new Date(data.signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'long', timeStyle: 'short' })}
-            </p>
-          </div>
-
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Firmatari</p>
-            <div className="space-y-3">
-              {data.signers.map((s, i) => (
-                <div key={i} className="flex items-start gap-3 bg-gray-50 rounded-xl px-4 py-3">
-                  <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-green-700 font-bold text-sm">
-                      {s.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                    </span>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-900 text-sm">{s.name}</p>
-                    {s.email && <p className="text-xs text-gray-400">{s.email}</p>}
-                    <p className="text-xs text-gray-400">
-                      {new Date(s.signed_at).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'short' })}
-                    </p>
-                    <p className="text-xs text-gray-300 font-mono mt-0.5">IP: {s.signing_ip}</p>
-                  </div>
-                </div>
-              ))}
+          {/* Dates */}
+          <div className="grid grid-cols-2 gap-4">
+            {data.createdAt && (
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Creato il</p>
+                <p className="text-gray-700 text-sm">{fmtDate(data.createdAt)}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Firmato il</p>
+              <p className="text-gray-700 text-sm">{fmtDate(data.signedAt)}</p>
             </div>
           </div>
 
+          {/* Signers */}
           <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Hash SHA-256</p>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Firmatari ({data.signers.length})</p>
+            <div className="space-y-3">
+              {data.signers.map((s, i) => {
+                const browser = parseBrowser(s.user_agent)
+                const os = parseOS(s.user_agent)
+                const deviceInfo = [browser, os].filter(Boolean).join(' / ')
+                return (
+                  <div key={i} className="bg-gray-50 rounded-xl px-4 py-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-green-700 font-bold text-sm">
+                          {s.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-gray-900 text-sm">{s.name}</p>
+                        {s.email && <p className="text-xs text-gray-500">{s.email}</p>}
+                        {s.phone && <p className="text-xs text-gray-500">{s.phone}</p>}
+                      </div>
+                      <div className="flex-shrink-0">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          s.channel === 'whatsapp' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {s.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Signer details */}
+                    <div className="mt-2 pt-2 border-t border-gray-200/60 grid grid-cols-2 gap-x-4 gap-y-1">
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Data firma</p>
+                        <p className="text-xs text-gray-600">{fmtDateShort(s.signed_at)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Indirizzo IP</p>
+                        <p className="text-xs text-gray-600 font-mono">{s.signing_ip}</p>
+                      </div>
+                      {deviceInfo && (
+                        <div className="col-span-2">
+                          <p className="text-[10px] text-gray-400 uppercase">Dispositivo</p>
+                          <p className="text-xs text-gray-600">{deviceInfo}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Hash */}
+          <div>
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Impronta digitale (SHA-256)</p>
             <p className="text-xs text-gray-500 font-mono break-all bg-gray-50 rounded-lg px-3 py-2">{data.originalHash}</p>
           </div>
 
-          <div className="pt-2 border-t border-gray-100 text-center">
+          {/* Audit Trail toggle */}
+          {data.auditTrail.length > 0 && (
+            <div>
+              <button onClick={() => setShowAuditTrail(!showAuditTrail)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                <span className="text-sm font-semibold text-gray-700">Audit Trail ({data.auditTrail.length} eventi)</span>
+                <svg className={`w-5 h-5 text-gray-400 transition-transform ${showAuditTrail ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+              {showAuditTrail && (
+                <div className="mt-3 relative pl-4 border-l-2 border-green-200 space-y-4">
+                  {data.auditTrail.map((evt, i) => (
+                    <div key={i} className="relative">
+                      <div className="absolute -left-[21px] w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
+                      <div className="ml-2">
+                        <p className="text-sm font-medium text-gray-800">{formatAction(evt.action)}</p>
+                        <p className="text-xs text-gray-400">{fmtDateShort(evt.timestamp)}</p>
+                        {evt.email && <p className="text-xs text-gray-500">{evt.email}</p>}
+                        {evt.ip && <p className="text-[10px] text-gray-400 font-mono">IP: {evt.ip}</p>}
+                        {evt.userAgent && (
+                          <p className="text-[10px] text-gray-400">
+                            {[parseBrowser(evt.userAgent), parseOS(evt.userAgent)].filter(Boolean).join(' / ')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div className="pt-2 border-t border-gray-100 text-center space-y-1">
             <p className="text-xs text-gray-400">
-              Firma conforme al Regolamento eIDAS (UE) 910/2014
+              Firma elettronica avanzata conforme al Regolamento eIDAS (UE) 910/2014
+            </p>
+            <p className="text-[10px] text-gray-400">
+              Questo certificato attesta l'autenticità e l'integrità del documento firmato digitalmente tramite Trustera.
             </p>
             <p className="text-xs text-green-600 font-medium mt-1">
               <a href="https://trustera360.app" target="_blank" rel="noreferrer">www.trustera360.app</a>

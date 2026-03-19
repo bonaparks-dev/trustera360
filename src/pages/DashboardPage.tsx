@@ -543,7 +543,7 @@ export default function DashboardPage({ session }: { session: Session }) {
     return contacts.filter(c => {
       const usedByOther = signerRows.some((s, i) => i !== currentIndex && s.email && c.email && s.email.toLowerCase() === c.email.toLowerCase())
       if (usedByOther) return false
-      if (!q) return true
+      if (!q) return false
       return c.name.toLowerCase().includes(q) || c.email?.toLowerCase().includes(q) || c.phone?.includes(q)
     }).slice(0, 5)
   }

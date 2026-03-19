@@ -119,8 +119,8 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
           setPdfBlobUrl(url)
         }
       } catch (err: any) {
-        console.error('[FieldPlacementEditor] PDF load error:', err)
-        if (!cancelled) setPdfError(err.message)
+        console.error('[FieldPlacementEditor] PDF blob load error, falling back to direct URL:', err)
+        if (!cancelled) setPdfBlobUrl(pdfUrl)
       }
     }
     loadPdf()
@@ -486,6 +486,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
           {pdfBlobUrl && <Document
             file={pdfBlobUrl}
             onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={(err) => { console.error('[FieldPlacementEditor] react-pdf error:', err); setPdfError(err.message); setPdfLoading(false) }}
             loading=""
             className="flex flex-col items-center gap-6"
           >

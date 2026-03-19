@@ -2103,7 +2103,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                         </div>
 
                         {/* Mode: Contact selection or manual entry */}
-                        {!signer.name ? (
+                        {signer.mode === 'new' || !signer.name ? (
                           <>
                             {/* Contatto / Nuovo toggle */}
                             <div className="flex gap-2">

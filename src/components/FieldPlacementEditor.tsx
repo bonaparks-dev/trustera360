@@ -503,7 +503,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
             {Array.from({ length: numPages }, (_, i) => i + 1).map(pageNum => (
               <div
                 key={pageNum}
-                className="relative shadow-lg bg-white"
+                className="relative shadow-lg bg-white overflow-visible"
                 ref={el => { if (el) pageRefs.current.set(pageNum, el) }}
                 onDragOver={handlePageDragOver}
                 onDrop={e => handlePageDrop(e, pageNum)}

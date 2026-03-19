@@ -131,7 +131,11 @@ CREATE POLICY "Service role full access on signed_documents_log"
 -- (This must be done via the Supabase Dashboard > Storage > Create bucket "trustera")
 -- Set it to PUBLIC so PDFs can be accessed by react-pdf in the browser.
 
--- 9. Approver workflow columns on trustera_documents
+-- 9. PDF hash for QR code verification
+ALTER TABLE trustera_documents
+  ADD COLUMN IF NOT EXISTS pdf_hash text;
+
+-- 10. Approver workflow columns on trustera_documents
 -- approvers: jsonb array of { name, email, token, status: 'pending'|'approved'|'rejected', reason?, acted_at? }
 -- approval_status: overall approval state
 -- draft_signers: signers held until all approvers approve

@@ -2226,24 +2226,60 @@ export default function DashboardPage({ session }: { session: Session }) {
                             )}
                           </>
                         ) : (
-                          /* Selected contact summary */
-                          <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
-                            <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs font-bold text-green-600">
-                                {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                              </span>
+                          /* Selected contact summary + channel toggle */
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+                              <div className="w-9 h-9 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                                <span className="text-xs font-bold text-green-600">
+                                  {signer.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                                </span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-800 truncate">{signer.name}</p>
+                                <p className="text-xs text-gray-400 truncate">
+                                  {signer.channel === 'whatsapp' && signer.phone
+                                    ? `${signer.countryCode}${signer.phone}`
+                                    : signer.email || ''}
+                                </p>
+                              </div>
                             </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-medium text-gray-800 truncate">{signer.name}</p>
-                              <p className="text-xs text-gray-400 truncate">
-                                {signer.channel === 'whatsapp' && signer.phone
-                                  ? `WhatsApp · ${signer.countryCode}${signer.phone}`
-                                  : signer.email || ''}
-                              </p>
+
+                            {/* Channel toggle: Email / WhatsApp */}
+                            <div>
+                              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Invia tramite</p>
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => updateSignerRow(i, 'channel', 'email')}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${signer.channel === 'email' ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >Email</button>
+                                <button type="button" onClick={() => updateSignerRow(i, 'channel', 'whatsapp')}
+                                  className={`flex-1 py-2 rounded-xl text-xs font-medium transition-all ${signer.channel === 'whatsapp' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >WhatsApp</button>
+                              </div>
                             </div>
-                            <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${signer.channel === 'whatsapp' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>
-                              {signer.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
-                            </span>
+
+                            {/* If WhatsApp selected but no phone, show phone input */}
+                            {signer.channel === 'whatsapp' && !signer.phone && (
+                              <div className="flex gap-2">
+                                <select value={signer.countryCode} onChange={e => updateSignerRow(i, 'countryCode', e.target.value)}
+                                  className="w-24 border border-gray-200 rounded-xl px-2 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500">
+                                  {COUNTRY_CODES.map(cc => (
+                                    <option key={cc.code} value={cc.code}>{cc.flag} {cc.code}</option>
+                                  ))}
+                                </select>
+                                <input type="tel" value={signer.phone}
+                                  onChange={e => updateSignerRow(i, 'phone', e.target.value.replace(/[^\d\s]/g, ''))}
+                                  placeholder="347 1234567"
+                                  className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500" />
+                              </div>
+                            )}
+
+                            {/* If Email selected but no real email, show email input */}
+                            {signer.channel === 'email' && (!signer.email || signer.email.includes('@noemail')) && (
+                              <input type="email" value={signer.email.includes('@noemail') ? '' : signer.email}
+                                onChange={e => updateSignerRow(i, 'email', e.target.value)}
+                                placeholder="email@esempio.com"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-green-500" />
+                            )}
                           </div>
                         )}
                       </div>

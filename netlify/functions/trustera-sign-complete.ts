@@ -223,11 +223,11 @@ async function buildSignedPdf(
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
   const qrSize = 28
-  const logoH = 10
-  const logoW = logoImage ? (logoImage.width / logoImage.height) * logoH : 40
+  const logoH = 22
+  const logoW = logoImage ? (logoImage.width / logoImage.height) * logoH : 80
   const checkText = '✓  Certificato da'
-  const checkTextW = font.widthOfTextAtSize(checkText, 8)
-  const gap = 6
+  const checkTextW = font.widthOfTextAtSize(checkText, 9)
+  const gap = 8
   // Total width: QR + gap + checkText + gap + logo
   const totalW = qrSize + gap + checkTextW + gap + (logoImage ? logoW : 0)
   const startX = (lastW - totalW) / 2
@@ -244,8 +244,8 @@ async function buildSignedPdf(
   // "✓ Certificato da" text — vertically centered with QR
   lastPage.drawText(checkText, {
     x: startX + qrSize + gap,
-    y: footerY + qrSize / 2 - 3,
-    size: 8,
+    y: footerY + qrSize / 2 - 4,
+    size: 9,
     font,
     color: rgb(0.09, 0.64, 0.27),
   })
@@ -401,12 +401,20 @@ export const handler: Handler = async (event) => {
 
       // Save field values for this signer
       if (fieldValues && typeof fieldValues === 'object') {
+        console.log('[trustera-sign-complete] Saving field values:', JSON.stringify(fieldValues))
         for (const [fieldId, value] of Object.entries(fieldValues)) {
-          await supabase
+          // Try with signer_id first, fallback to just fieldId
+          const { data: updated, error: updateErr } = await supabase
             .from('trustera_document_fields')
             .update({ value: String(value), filled_at: new Date().toISOString() })
             .eq('id', fieldId)
-            .eq('signer_id', signerRow.id)
+            .select('id')
+
+          if (updateErr) {
+            console.warn('[trustera-sign-complete] Field update error for', fieldId, ':', updateErr.message)
+          } else {
+            console.log('[trustera-sign-complete] Field', fieldId, '=', String(value), 'saved:', updated?.length, 'rows')
+          }
         }
       }
 

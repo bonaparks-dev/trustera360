@@ -231,21 +231,23 @@ async function buildSignedPdf(
   const gray = rgb(0.35, 0.35, 0.35)
   const lightGray = rgb(0.75, 0.75, 0.75)
 
-  // Outer rounded rectangle (light gray border)
+  // Outer rectangle (white background, light gray border)
   lastPage.drawRectangle({
     x: sealX, y: sealY, width: sealW, height: sealH,
     borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
-    color: rgb(0.98, 0.98, 0.98),
+    color: rgb(1, 1, 1),
   })
 
-  // ── Header: icon + "Trustera Verified Seal" ──
+  // ── Header: Trustera logo + "Verified Seal" ──
   const headerY = sealY + sealH - 16
-  if (iconImage) {
-    lastPage.drawImage(iconImage, { x: sealX + 8, y: headerY - 2, width: 12, height: 12 })
+  let headerTextX = sealX + 10
+  if (logoImage) {
+    const hLogoH = 12
+    const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+    lastPage.drawImage(logoImage, { x: sealX + 8, y: headerY - 2, width: hLogoW, height: hLogoH })
+    headerTextX = sealX + 10 + hLogoW + 4
   }
-  lastPage.drawText('Trustera ', { x: sealX + 22, y: headerY, size: 9, font: boldFont, color: darkGreen })
-  const tvW = boldFont.widthOfTextAtSize('Trustera ', 9)
-  lastPage.drawText('Verified Seal', { x: sealX + 22 + tvW, y: headerY, size: 9, font, color: gray })
+  lastPage.drawText('Verified Seal', { x: headerTextX, y: headerY, size: 9, font, color: gray })
 
   // Separator line
   lastPage.drawLine({
@@ -258,9 +260,9 @@ async function buildSignedPdf(
   const infoX = sealX + 10
   const infoY = headerY - 18
 
-  // Signer name (bold, larger)
-  const signerName = signers[0]?.name || 'Firmatario'
-  lastPage.drawText(signerName, { x: infoX, y: infoY, size: 11, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+  // Signer name(s) (bold, larger) — show all signers
+  const allSignerNames = signers.map(s => s.name).join(', ') || 'Firmatario'
+  lastPage.drawText(allSignerNames, { x: infoX, y: infoY, size: 11, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
 
   // Date + time
   const signDate = new Date(signers[0]?.signed_at || new Date().toISOString())
@@ -275,21 +277,21 @@ async function buildSignedPdf(
   // Certificate ID
   lastPage.drawText(`ID Certificato: ${certId}`, { x: infoX, y: infoY - 24, size: 7, font, color: gray })
 
-  // ── Right side: QR code ──
-  const qrSize = 52
-  lastPage.drawImage(qrImage, {
-    x: sealX + sealW - qrSize - 12,
-    y: sealY + sealH - qrSize - 20,
-    width: qrSize, height: qrSize,
-  })
-
   // ── Footer bar ──
   const footerBarY = sealY
   const footerBarH = 16
+
+  // ── Right side: QR code (small) ──
+  const qrSize = 30
+  lastPage.drawImage(qrImage, {
+    x: sealX + sealW - qrSize - 12,
+    y: sealY + footerBarH + (sealH - footerBarH - qrSize) / 2,
+    width: qrSize, height: qrSize,
+  })
   lastPage.drawRectangle({
     x: sealX, y: footerBarY, width: sealW, height: footerBarH,
-    color: rgb(0.95, 0.95, 0.95),
-    borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.5,
+    color: rgb(0.97, 0.97, 0.97),
+    borderColor: rgb(0.88, 0.88, 0.88), borderWidth: 0.5,
   })
 
   // Small QR icon + "Scansiona per verifica completa AuditTrail"
@@ -298,7 +300,7 @@ async function buildSignedPdf(
 
   // Trustera logo bottom-right
   if (logoImage) {
-    const lH = 10
+    const lH = 12
     const lW = (logoImage.width / logoImage.height) * lH
     lastPage.drawImage(logoImage, {
       x: sealX + sealW - lW - 10,

@@ -142,6 +142,9 @@ export default function VerifyPage() {
       <div className="bg-white shadow-lg max-w-3xl mx-auto">
         {/* Header */}
         <div className="px-8 pt-8 pb-4">
+          <div className="flex items-center gap-4 mb-2">
+            <img src="/trustera-logo.png" alt="Trustera" className="h-12" />
+          </div>
           <h1 className="text-2xl font-bold text-gray-900">Audit Trail - Firma Elettronica</h1>
           <p className="text-sm text-gray-500 mt-1">{data.documentName}{data.signers[0] ? ` - ${data.signers[0].name}` : ''}</p>
         </div>

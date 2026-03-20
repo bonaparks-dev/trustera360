@@ -250,17 +250,9 @@ async function buildSignedPdf(
     lastPage.drawText('Trustera  Verified Seal', { x: sealX + 8, y: headerY + 1, size: 7, font: boldFont, color: gray })
   }
 
-  // Separator line — below header
-  const sepY = headerY - 5
-  lastPage.drawLine({
-    start: { x: sealX + 8, y: sepY },
-    end: { x: sealX + sealW - 8, y: sepY },
-    thickness: 0.4, color: lightGray,
-  })
-
   // ── Left side: signer info ──
   const infoX = sealX + 8
-  const infoY = sepY - 11
+  const infoY = headerY - 14
 
   // Signer name(s) (bold)
   const allSignerNames = signers.map(s => s.name).join(', ') || 'Firmatario'
@@ -279,24 +271,17 @@ async function buildSignedPdf(
   // Certificate ID
   lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 17, size: 5, font, color: lightGray })
 
-  // ── Right side: QR code (compact, within content area) ──
+  // ── Right side: QR code (compact) ──
   const qrSize = 18
-  const contentTopY = sepY - 3
   lastPage.drawImage(qrImage, {
     x: sealX + sealW - qrSize - 10,
-    y: contentTopY - qrSize,
+    y: infoY - 6,
     width: qrSize, height: qrSize,
   })
 
-  // ── Footer: white bg, Trustera logo centered ──
+  // ── Footer: white, no lines ──
   const footerBarY = sealY
   const footerBarH = 12
-  // Thin top line for footer
-  lastPage.drawLine({
-    start: { x: sealX + 8, y: footerBarY + footerBarH },
-    end: { x: sealX + sealW - 8, y: footerBarY + footerBarH },
-    thickness: 0.3, color: rgb(0.9, 0.9, 0.9),
-  })
 
   // Footer text left
   lastPage.drawText('Scansiona per verifica ', { x: sealX + 8, y: footerBarY + 3, size: 4.5, font, color: lightGray })

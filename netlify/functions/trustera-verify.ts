@@ -22,7 +22,7 @@ export const handler: Handler = async (event) => {
     // 1. Look up document by pdf_hash in trustera_documents
     const { data: docs, error: docError } = await supabase
       .from('trustera_documents')
-      .select('id, name, signed_at, pdf_hash, status, created_at, owner_id')
+      .select('id, name, signed_at, pdf_hash, status, created_at, owner_id, signed_pdf_url')
       .eq('pdf_hash', hash)
       .eq('status', 'signed')
       .order('signed_at', { ascending: false })
@@ -44,10 +44,17 @@ export const handler: Handler = async (event) => {
         senderName = ownerUser?.user_metadata?.full_name || ownerUser?.email || ''
       }
 
+      // Fetch sender email
+      let senderEmail = ''
+      if (doc.owner_id) {
+        const { data: { user: ownerUserEmail } } = await supabase.auth.admin.getUserById(doc.owner_id)
+        senderEmail = ownerUserEmail?.email || ''
+      }
+
       // Fetch signers with full audit data
       const { data: signers } = await supabase
         .from('trustera_document_signers')
-        .select('signer_name, signer_email, signer_phone, notification_channel, signed_at, signing_ip, signing_user_agent')
+        .select('signer_name, signer_email, signer_phone, notification_channel, signed_at, signing_ip, signing_user_agent, marketing_consent')
         .eq('document_id', doc.id)
         .eq('status', 'signed')
         .order('signed_at', { ascending: true })
@@ -59,7 +66,8 @@ export const handler: Handler = async (event) => {
         channel: s.notification_channel || 'email',
         signed_at: s.signed_at,
         signing_ip: s.signing_ip || 'N/A',
-        user_agent: s.signing_user_agent || ''
+        user_agent: s.signing_user_agent || '',
+        marketing_consent: s.marketing_consent ?? false,
       }))
 
       // Fallback: check signed_documents_log for signers
@@ -113,6 +121,7 @@ export const handler: Handler = async (event) => {
           createdAt: doc.created_at,
           originalHash: doc.pdf_hash,
           senderName,
+          senderEmail,
           signers: signerList,
           auditTrail: (auditEvents || []).map((e: any) => ({
             action: e.action,

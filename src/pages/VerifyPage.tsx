@@ -9,6 +9,7 @@ interface SignerInfo {
   signed_at: string
   signing_ip: string
   user_agent: string
+  marketing_consent: boolean
 }
 
 interface AuditEvent {
@@ -26,86 +27,62 @@ interface VerificationData {
   createdAt: string | null
   originalHash: string
   senderName: string
+  senderEmail?: string
   signers: SignerInfo[]
   auditTrail: AuditEvent[]
 }
 
 function formatAction(action: string): string {
   const map: Record<string, string> = {
-    otp_sent: 'Codice OTP inviato',
-    otp_verified: 'Identità verificata (OTP)',
-    otp_failed: 'Tentativo OTP fallito',
-    otp_expired: 'Codice OTP scaduto',
-    document_opened: 'Documento aperto dal firmatario',
-    document_viewed: 'Documento visualizzato',
-    signature_applied: 'Firma applicata',
-    document_signed: 'Documento firmato',
-    signing_completed: 'Processo di firma completato',
-    email_sent: 'Richiesta di firma inviata via Email',
-    whatsapp_sent: 'Richiesta di firma inviata via WhatsApp',
-    signed_pdf_sent: 'PDF firmato consegnato',
-    approval_requested: 'Richiesta di approvazione inviata',
-    approval_approved: 'Documento approvato',
-    approval_rejected: 'Documento rifiutato',
+    otp_sent: 'OTP Inviato',
+    otp_verified: 'OTP Verificato',
+    otp_failed: 'OTP Non Valido',
+    otp_expired: 'OTP Scaduto',
+    document_opened: 'Documento Visualizzato',
+    document_viewed: 'Documento Visualizzato',
+    signature_applied: 'Firma Applicata',
+    document_signed: 'Documento Firmato',
+    signing_completed: 'Firma Completata',
+    email_sent: 'Link Inviato',
+    whatsapp_sent: 'Link Inviato',
+    signed_pdf_sent: 'PDF Firmato Inviato',
+    approval_requested: 'Approvazione Richiesta',
+    approval_approved: 'Approvato',
+    approval_rejected: 'Rifiutato',
   }
   return map[action] || action.replace(/_/g, ' ')
 }
 
-function actionIcon(action: string): string {
-  const icons: Record<string, string> = {
-    otp_sent: '🔐',
-    otp_verified: '✅',
-    otp_failed: '❌',
-    otp_expired: '⏰',
-    document_opened: '📄',
-    document_viewed: '👁',
-    signature_applied: '✍️',
-    document_signed: '📝',
-    signing_completed: '🏁',
-    email_sent: '📧',
-    whatsapp_sent: '💬',
-    signed_pdf_sent: '📤',
-    approval_requested: '🔔',
-    approval_approved: '👍',
-    approval_rejected: '👎',
+function formatDescription(evt: AuditEvent): string {
+  const name = evt.metadata?.signer_name || evt.metadata?.approver_name || ''
+  const channel = evt.metadata?.channel === 'whatsapp' ? 'WhatsApp' : evt.metadata?.channel === 'email' ? 'Email' : ''
+
+  switch (evt.action) {
+    case 'email_sent': return `Link di firma inviato via Email${name ? ` a ${name}` : ''}`
+    case 'whatsapp_sent': return `Link di firma inviato via WhatsApp${name ? ` a ${name}` : ''}`
+    case 'document_opened': return `Documento visualizzato da ${name || evt.email}`
+    case 'otp_sent': return `Codice OTP inviato via ${channel}${name ? ` a ${name}` : ''}`
+    case 'otp_verified': return `Codice OTP verificato con successo da ${evt.email || name}`
+    case 'otp_failed': return 'Codice OTP non valido'
+    case 'otp_expired': return 'Codice OTP scaduto'
+    case 'signature_applied': return `Documento firmato da ${name}${evt.email ? ` (${evt.email})` : ''}`
+    case 'signing_completed': return 'Processo di firma completato — PDF firmato generato'
+    case 'signed_pdf_sent': return `PDF firmato consegnato via ${channel}${name ? ` a ${name}` : ''}`
+    case 'approval_requested': return `Richiesta di approvazione inviata a ${name || evt.email}`
+    case 'approval_approved': return `Documento approvato da ${name || evt.email}`
+    case 'approval_rejected': return `Documento rifiutato da ${name || evt.email}${evt.metadata?.reason ? ` — ${evt.metadata.reason}` : ''}`
+    default: return formatAction(evt.action)
   }
-  return icons[action] || '•'
 }
 
-function actionColor(action: string): string {
-  if (['otp_verified', 'signature_applied', 'signing_completed', 'approval_approved'].includes(action)) return 'bg-green-500'
-  if (['otp_failed', 'otp_expired', 'approval_rejected'].includes(action)) return 'bg-red-400'
-  if (['email_sent', 'whatsapp_sent', 'signed_pdf_sent'].includes(action)) return 'bg-blue-400'
-  if (['document_opened', 'document_viewed'].includes(action)) return 'bg-gray-400'
-  return 'bg-green-500'
-}
-
-function parseBrowser(ua: string): string {
-  if (!ua) return ''
-  if (ua.includes('Chrome') && !ua.includes('Edg')) return 'Chrome'
-  if (ua.includes('Firefox')) return 'Firefox'
-  if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari'
-  if (ua.includes('Edg')) return 'Edge'
-  if (ua.includes('Opera') || ua.includes('OPR')) return 'Opera'
-  return 'Browser'
-}
-
-function parseOS(ua: string): string {
-  if (!ua) return ''
-  if (ua.includes('Windows')) return 'Windows'
-  if (ua.includes('Mac OS')) return 'macOS'
-  if (ua.includes('iPhone') || ua.includes('iPad')) return 'iOS'
-  if (ua.includes('Android')) return 'Android'
-  if (ua.includes('Linux')) return 'Linux'
-  return ''
-}
+const fmtDate = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'long', timeStyle: 'short' })
+const fmtDateShort = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'medium' })
 
 export default function VerifyPage() {
   const { hash } = useParams<{ hash: string }>()
   const [data, setData] = useState<VerificationData | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
-  const [showAuditTrail, setShowAuditTrail] = useState(false)
 
   useEffect(() => {
     if (!hash) { setError('Hash mancante'); setLoading(false); return }
@@ -147,178 +124,122 @@ export default function VerifyPage() {
     )
   }
 
-  const fmtDate = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'long', timeStyle: 'short' })
-  const fmtDateShort = (d: string) => new Date(d).toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'medium' })
+  const SectionTitle = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border-l-4 border-amber-400 px-4 py-2 mt-6 mb-3">
+      <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wide">{children}</h2>
+    </div>
+  )
+
+  const InfoRow = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
+    <div className="py-1">
+      <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className={`text-sm text-gray-800 ${mono ? 'font-mono text-xs' : ''}`}>{value || '—'}</p>
+    </div>
+  )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-12">
-      <div className="bg-white rounded-2xl shadow-lg max-w-lg w-full overflow-hidden">
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="bg-white shadow-lg max-w-3xl mx-auto">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-green-700 px-8 py-6 text-center">
-          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-white">Documento Verificato</h1>
+        <div className="px-8 pt-8 pb-4">
+          <h1 className="text-2xl font-bold text-gray-900">Audit Trail - Firma Elettronica</h1>
+          <p className="text-sm text-gray-500 mt-1">{data.documentName}{data.signers[0] ? ` - ${data.signers[0].name}` : ''}</p>
         </div>
 
-        {/* Content */}
-        <div className="px-8 py-6 space-y-5">
-          {/* Document info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Documento</p>
-              <p className="text-gray-900 font-semibold text-sm">{data.documentName}</p>
-            </div>
-            {data.senderName && (
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Inviato da</p>
-                <p className="text-gray-700 text-sm">{data.senderName}</p>
+        <div className="px-8 pb-8">
+          {/* ── INFORMAZIONI DOCUMENTO ── */}
+          <SectionTitle>Informazioni Documento</SectionTitle>
+          <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
+            <InfoRow label="Documento" value={data.documentName} />
+            <InfoRow label="Inviato da" value={data.senderName || '—'} />
+            {data.senderEmail && <InfoRow label="Email mittente" value={data.senderEmail} />}
+            {data.createdAt && <InfoRow label="Data creazione" value={fmtDate(data.createdAt)} />}
+            <InfoRow label="Data firma" value={fmtDate(data.signedAt)} />
+          </div>
+
+          {/* ── INFORMAZIONI FIRMATARIO (one per signer) ── */}
+          {data.signers.map((s, i) => (
+            <div key={i}>
+              <SectionTitle>Informazioni Firmatario {data.signers.length > 1 ? `(${i + 1}/${data.signers.length})` : ''}</SectionTitle>
+              <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
+                <InfoRow label="Nome e Cognome" value={s.name} />
+                <InfoRow label="Email" value={s.email} />
+                {s.phone && <InfoRow label="Telefono" value={s.phone} />}
+                <InfoRow label="Data firma" value={fmtDateShort(s.signed_at)} />
+                <InfoRow label="Canale" value={s.channel === 'whatsapp' ? 'WhatsApp' : 'Email'} />
+                <InfoRow label="IP" value={s.signing_ip} mono />
+                {s.user_agent && <div className="col-span-2"><InfoRow label="User Agent" value={s.user_agent} /></div>}
               </div>
-            )}
-          </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
-            {data.createdAt && (
-              <div>
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Creato il</p>
-                <p className="text-gray-700 text-sm">{fmtDate(data.createdAt)}</p>
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Firmato il</p>
-              <p className="text-gray-700 text-sm">{fmtDate(data.signedAt)}</p>
-            </div>
-          </div>
-
-          {/* Signers */}
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Firmatari ({data.signers.length})</p>
-            <div className="space-y-3">
-              {data.signers.map((s, i) => {
-                const browser = parseBrowser(s.user_agent)
-                const os = parseOS(s.user_agent)
-                const deviceInfo = [browser, os].filter(Boolean).join(' / ')
-                return (
-                  <div key={i} className="bg-gray-50 rounded-xl px-4 py-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-green-700 font-bold text-sm">
-                          {s.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-gray-900 text-sm">{s.name}</p>
-                        {s.email && <p className="text-xs text-gray-500">{s.email}</p>}
-                        {s.phone && <p className="text-xs text-gray-500">{s.phone}</p>}
-                      </div>
-                      <div className="flex-shrink-0">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          s.channel === 'whatsapp' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {s.channel === 'whatsapp' ? 'WhatsApp' : 'Email'}
-                        </span>
-                      </div>
-                    </div>
-                    {/* Signer details */}
-                    <div className="mt-2 pt-2 border-t border-gray-200/60 grid grid-cols-2 gap-x-4 gap-y-1">
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">Data firma</p>
-                        <p className="text-xs text-gray-600">{fmtDateShort(s.signed_at)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-400 uppercase">Indirizzo IP</p>
-                        <p className="text-xs text-gray-600 font-mono">{s.signing_ip}</p>
-                      </div>
-                      {deviceInfo && (
-                        <div className="col-span-2">
-                          <p className="text-[10px] text-gray-400 uppercase">Dispositivo</p>
-                          <p className="text-xs text-gray-600">{deviceInfo}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Hash */}
-          <div>
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Impronta digitale (SHA-256)</p>
-            <p className="text-xs text-gray-500 font-mono break-all bg-gray-50 rounded-lg px-3 py-2">{data.originalHash}</p>
-          </div>
-
-          {/* Audit Trail toggle */}
-          {data.auditTrail.length > 0 && (
-            <div>
-              <button onClick={() => setShowAuditTrail(!showAuditTrail)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                <span className="text-sm font-semibold text-gray-700">Audit Trail ({data.auditTrail.length} eventi)</span>
-                <svg className={`w-5 h-5 text-gray-400 transition-transform ${showAuditTrail ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                </svg>
-              </button>
-              {showAuditTrail && (
-                <div className="mt-3 relative pl-5 border-l-2 border-gray-200 space-y-4">
-                  {data.auditTrail.map((evt, i) => {
-                    const color = actionColor(evt.action)
-                    const icon = actionIcon(evt.action)
-                    const browser = parseBrowser(evt.userAgent)
-                    const os = parseOS(evt.userAgent)
-                    const deviceInfo = [browser, os].filter(Boolean).join(' / ')
-                    const signerName = evt.metadata?.signer_name || evt.metadata?.approver_name || ''
-                    const channel = evt.metadata?.channel || ''
-                    return (
-                      <div key={i} className="relative">
-                        <div className={`absolute -left-[23px] w-3.5 h-3.5 rounded-full ${color} border-2 border-white flex items-center justify-center`} />
-                        <div className="ml-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">{icon}</span>
-                            <p className="text-sm font-medium text-gray-800">{formatAction(evt.action)}</p>
-                          </div>
-                          <div className="ml-6 space-y-0.5">
-                            <p className="text-xs text-gray-400">{fmtDateShort(evt.timestamp)}</p>
-                            {(evt.email || signerName) && (
-                              <p className="text-xs text-gray-600">
-                                {signerName && <span className="font-medium">{signerName}</span>}
-                                {signerName && evt.email && ' — '}
-                                {evt.email && <span>{evt.email}</span>}
-                              </p>
-                            )}
-                            {channel && (
-                              <p className="text-[10px] text-gray-400">
-                                Canale: {channel === 'whatsapp' ? 'WhatsApp' : channel === 'email' ? 'Email' : channel}
-                              </p>
-                            )}
-                            {evt.ip && <p className="text-[10px] text-gray-400 font-mono">IP: {evt.ip}</p>}
-                            {deviceInfo && <p className="text-[10px] text-gray-400">{deviceInfo}</p>}
-                            {evt.metadata?.reason && (
-                              <p className="text-[10px] text-red-500">Motivo: {evt.metadata.reason}</p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
+              {/* Marketing consent */}
+              <SectionTitle>Consenso Marketing (Trustera)</SectionTitle>
+              <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
+                <div className="py-1">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Consenso</p>
+                  <p className={`text-sm font-bold ${s.marketing_consent ? 'text-green-600' : 'text-red-500'}`}>
+                    {s.marketing_consent ? 'SI' : 'NO'}
+                  </p>
                 </div>
-              )}
+                <InfoRow label="Data" value={fmtDateShort(s.signed_at)} />
+              </div>
             </div>
+          ))}
+
+          {/* ── VERIFICA INTEGRITA ── */}
+          <SectionTitle>Verifica Integrita</SectionTitle>
+          <div className="space-y-2">
+            <div className="border border-gray-200 rounded-lg px-4 py-3">
+              <p className="text-xs font-semibold text-gray-700 mb-1">Hash SHA-256 Documento Originale:</p>
+              <p className="text-xs text-gray-600 font-mono break-all">{data.originalHash}</p>
+            </div>
+          </div>
+
+          {/* ── REGISTRO EVENTI ── */}
+          <SectionTitle>Registro Eventi</SectionTitle>
+          {data.auditTrail.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border border-gray-200">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Data/Ora</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Evento</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Descrizione</th>
+                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[130px]">IP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.auditTrail.map((evt, i) => (
+                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2.5 text-xs text-gray-600 align-top whitespace-nowrap">{fmtDateShort(evt.timestamp)}</td>
+                      <td className="px-3 py-2.5 text-xs font-semibold text-gray-800 align-top">{formatAction(evt.action)}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-600 align-top">{formatDescription(evt)}</td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono align-top">{evt.ip || ''}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic py-3">Nessun evento registrato. Gli eventi verranno tracciati per i nuovi documenti.</p>
           )}
 
-          {/* Footer */}
-          <div className="pt-2 border-t border-gray-100 text-center space-y-1">
+          {/* ── Footer ── */}
+          <div className="mt-8 pt-4 border-t border-gray-200 text-center space-y-1">
             <p className="text-xs text-gray-400">
               Firma elettronica avanzata conforme al Regolamento eIDAS (UE) 910/2014
             </p>
             <p className="text-[10px] text-gray-400">
-              Questo certificato attesta l'autenticità e l'integrità del documento firmato digitalmente tramite Trustera.
+              Questo certificato attesta l'autenticita e l'integrita del documento firmato digitalmente tramite Trustera.
             </p>
-            <p className="text-xs text-green-600 font-medium mt-1">
-              <a href="https://trustera360.app" target="_blank" rel="noreferrer">www.trustera360.app</a>
+            <p className="text-[10px] text-gray-400 mt-2">
+              Documento generato il {new Date().toLocaleString('it-IT', { timeZone: 'Europe/Rome', dateStyle: 'short', timeStyle: 'medium' })}
             </p>
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <img src="/trustera-logo.png" alt="Trustera" className="h-6" />
+              <span className="text-xs text-green-600 font-medium">
+                <a href="https://trustera360.app" target="_blank" rel="noreferrer">www.trustera360.app</a>
+              </span>
+            </div>
           </div>
         </div>
       </div>

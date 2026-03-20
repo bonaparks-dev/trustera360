@@ -171,17 +171,6 @@ export default function VerifyPage() {
                 {s.user_agent && <div className="col-span-2"><InfoRow label="User Agent" value={s.user_agent} /></div>}
               </div>
 
-              {/* Marketing consent */}
-              <SectionTitle>Consenso Marketing (Trustera)</SectionTitle>
-              <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
-                <div className="py-1">
-                  <p className="text-[10px] text-gray-400 uppercase tracking-wide">Consenso</p>
-                  <p className={`text-sm font-bold ${s.marketing_consent ? 'text-green-600' : 'text-red-500'}`}>
-                    {s.marketing_consent ? 'SI' : 'NO'}
-                  </p>
-                </div>
-                <InfoRow label="Data" value={fmtDateShort(s.signed_at)} />
-              </div>
             </div>
           ))}
 

@@ -236,82 +236,108 @@ async function buildSignedPdf(
   const year = new Date().getFullYear()
   const certId = `TR-${year}-${originalHash.slice(0, 8).toUpperCase()}`
 
-  // Seal dimensions — compact to fit inside signature boxes
-  const sealW = 160
-  const sealH = 52
-  const sealX = (lastW - sealW) / 2
-  const sealY = 18
+  // Seal dimensions — compact to fit inside contract signature boxes
+  const sealW = 150
+  const sealH = 48
+  const sealYPos = 10
 
   const green = rgb(0.09, 0.55, 0.27)
   const darkGreen = rgb(0.06, 0.35, 0.18)
   const gray = rgb(0.35, 0.35, 0.35)
   const lightGray = rgb(0.75, 0.75, 0.75)
 
-  // Outer rectangle (white background, light gray border)
-  lastPage.drawRectangle({
-    x: sealX, y: sealY, width: sealW, height: sealH,
-    borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
-    color: rgb(1, 1, 1),
-  })
-
-  // ── Header: Trustera logo + "Verified Seal" ──
-  const headerY = sealY + sealH - 16
-  if (logoImage) {
-    const hLogoH = 13
-    const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-    lastPage.drawImage(logoImage, { x: sealX + 6, y: headerY - 1, width: hLogoW, height: hLogoH })
-    const vsX = sealX + 6 + hLogoW + 4
-    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 2, size: 6, font, color: lightGray })
-  } else {
-    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 6, y: headerY + 2, size: 6, font: boldFont, color: gray })
+  // Draw one seal per signer, positioned for DR7 contract layout:
+  // A4 = 595pt wide. Contract has 3 columns:
+  //   FIRMA LOCATORE (~0-195), 1° guidatore (~195-395), 2° guidatore (~395-595)
+  // 1 signer → center of "1° guidatore" column
+  // 2 signers → 1st in "1° guidatore", 2nd in "2° guidatore"
+  // 3+ signers → spread evenly across page
+  function getSealX(signerIndex: number, totalSigners: number): number {
+    if (totalSigners === 1) {
+      // Center of "1° guidatore" column: (195 + 395) / 2 - sealW/2
+      return 220
+    } else if (totalSigners === 2) {
+      // 1st driver column center, then 2nd driver column center
+      return signerIndex === 0 ? 220 : 420
+    } else {
+      // Spread evenly, skip FIRMA LOCATORE area
+      const usableStart = 195
+      const usableWidth = lastW - usableStart - 10
+      const spacing = usableWidth / totalSigners
+      return usableStart + spacing * signerIndex + (spacing - sealW) / 2
+    }
   }
 
-  // ── Left side: signer info ──
-  const infoX = sealX + 6
-  const infoY = headerY - 12
+  for (let si = 0; si < signers.length; si++) {
+    const signer = signers[si]
+    const sealX = getSealX(si, signers.length)
 
-  // Signer name(s) (bold)
-  const allSignerNames = signers.map(s => s.name).join(', ') || 'Firmatario'
-  lastPage.drawText(allSignerNames, { x: infoX, y: infoY, size: 6.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
-
-  // Date + time
-  const signDate = new Date(signers[0]?.signed_at || new Date().toISOString())
-  const dd = String(signDate.getDate()).padStart(2, '0')
-  const mo = String(signDate.getMonth() + 1).padStart(2, '0')
-  const yy = signDate.getFullYear()
-  const hh = String(signDate.getHours()).padStart(2, '0')
-  const mi = String(signDate.getMinutes()).padStart(2, '0')
-  const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
-  lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 8, size: 5, font, color: gray })
-
-  // Certificate ID
-  lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 15, size: 4.5, font, color: lightGray })
-
-  // ── Right side: QR code ──
-  const qrSize = 16
-  lastPage.drawImage(qrImage, {
-    x: sealX + sealW - qrSize - 6,
-    y: infoY - 5,
-    width: qrSize, height: qrSize,
-  })
-
-  // ── Footer ──
-  const footerBarY = sealY
-  const footerBarH = 10
-
-  // Footer text left
-  lastPage.drawText('Scansiona per verifica ', { x: sealX + 6, y: footerBarY + 3, size: 4, font, color: lightGray })
-  lastPage.drawText('AuditTrail', { x: sealX + 6 + font.widthOfTextAtSize('Scansiona per verifica ', 4), y: footerBarY + 3, size: 4, font: boldFont, color: darkGreen })
-
-  // Footer Trustera logo right
-  if (logoImage) {
-    const lH = 8
-    const lW = (logoImage.width / logoImage.height) * lH
-    lastPage.drawImage(logoImage, {
-      x: sealX + sealW - lW - 6,
-      y: footerBarY + (footerBarH - lH) / 2,
-      width: lW, height: lH,
+    // Outer rectangle (white background, light gray border)
+    lastPage.drawRectangle({
+      x: sealX, y: sealYPos, width: sealW, height: sealH,
+      borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
+      color: rgb(1, 1, 1),
     })
+
+    // ── Header: Trustera logo + "Verified Seal" ──
+    const headerY = sealYPos + sealH - 14
+    if (logoImage) {
+      const hLogoH = 11
+      const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+      lastPage.drawImage(logoImage, { x: sealX + 5, y: headerY - 1, width: hLogoW, height: hLogoH })
+      const vsX = sealX + 5 + hLogoW + 3
+      lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 5.5, font, color: lightGray })
+    } else {
+      lastPage.drawText('Trustera  Verified Seal', { x: sealX + 5, y: headerY + 1, size: 5.5, font: boldFont, color: gray })
+    }
+
+    // ── Left side: signer info ──
+    const infoX = sealX + 5
+    const infoY = headerY - 11
+
+    // Signer name (bold)
+    const signerName = signer.name || 'Firmatario'
+    lastPage.drawText(signerName, { x: infoX, y: infoY, size: 6, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+
+    // Date + time
+    const signDate = new Date(signer.signed_at || new Date().toISOString())
+    const dd = String(signDate.getDate()).padStart(2, '0')
+    const mo = String(signDate.getMonth() + 1).padStart(2, '0')
+    const yy = signDate.getFullYear()
+    const hh = String(signDate.getHours()).padStart(2, '0')
+    const mi = String(signDate.getMinutes()).padStart(2, '0')
+    const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
+    lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 8, size: 4.5, font, color: gray })
+
+    // Certificate ID
+    lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 14, size: 4, font, color: lightGray })
+
+    // ── Right side: QR code ──
+    const qrSize = 15
+    lastPage.drawImage(qrImage, {
+      x: sealX + sealW - qrSize - 5,
+      y: infoY - 4,
+      width: qrSize, height: qrSize,
+    })
+
+    // ── Footer ──
+    const footerBarY = sealYPos
+    const footerBarH = 9
+
+    // Footer text left
+    lastPage.drawText('Verifica ', { x: sealX + 5, y: footerBarY + 2.5, size: 3.5, font, color: lightGray })
+    lastPage.drawText('AuditTrail', { x: sealX + 5 + font.widthOfTextAtSize('Verifica ', 3.5), y: footerBarY + 2.5, size: 3.5, font: boldFont, color: darkGreen })
+
+    // Footer Trustera logo right
+    if (logoImage) {
+      const lH = 7
+      const lW = (logoImage.width / logoImage.height) * lH
+      lastPage.drawImage(logoImage, {
+        x: sealX + sealW - lW - 5,
+        y: footerBarY + (footerBarH - lH) / 2,
+        width: lW, height: lH,
+      })
+    }
   }
 
   return pdfDoc.save()

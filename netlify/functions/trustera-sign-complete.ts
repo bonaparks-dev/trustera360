@@ -237,9 +237,9 @@ async function buildSignedPdf(
   const certId = `TR-${year}-${originalHash.slice(0, 8).toUpperCase()}`
 
   // Seal dimensions — compact to fit inside contract signature boxes
-  const sealW = 150
-  const sealH = 48
-  const sealYPos = 10
+  const sealW = 130
+  const sealH = 42
+  const sealYPos = 12
 
   const green = rgb(0.09, 0.55, 0.27)
   const darkGreen = rgb(0.06, 0.35, 0.18)
@@ -280,24 +280,24 @@ async function buildSignedPdf(
     })
 
     // ── Header: Trustera logo + "Verified Seal" ──
-    const headerY = sealYPos + sealH - 14
+    const headerY = sealYPos + sealH - 12
     if (logoImage) {
-      const hLogoH = 11
+      const hLogoH = 9
       const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-      lastPage.drawImage(logoImage, { x: sealX + 5, y: headerY - 1, width: hLogoW, height: hLogoH })
-      const vsX = sealX + 5 + hLogoW + 3
-      lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 5.5, font, color: lightGray })
+      lastPage.drawImage(logoImage, { x: sealX + 4, y: headerY - 1, width: hLogoW, height: hLogoH })
+      const vsX = sealX + 4 + hLogoW + 2
+      lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 4.5, font, color: lightGray })
     } else {
-      lastPage.drawText('Trustera  Verified Seal', { x: sealX + 5, y: headerY + 1, size: 5.5, font: boldFont, color: gray })
+      lastPage.drawText('Trustera  Verified Seal', { x: sealX + 4, y: headerY + 1, size: 4.5, font: boldFont, color: gray })
     }
 
     // ── Left side: signer info ──
-    const infoX = sealX + 5
-    const infoY = headerY - 11
+    const infoX = sealX + 4
+    const infoY = headerY - 9
 
     // Signer name (bold)
     const signerName = signer.name || 'Firmatario'
-    lastPage.drawText(signerName, { x: infoX, y: infoY, size: 6, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+    lastPage.drawText(signerName, { x: infoX, y: infoY, size: 5.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
 
     // Date + time
     const signDate = new Date(signer.signed_at || new Date().toISOString())
@@ -307,33 +307,33 @@ async function buildSignedPdf(
     const hh = String(signDate.getHours()).padStart(2, '0')
     const mi = String(signDate.getMinutes()).padStart(2, '0')
     const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
-    lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 8, size: 4.5, font, color: gray })
+    lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 7, size: 4, font, color: gray })
 
     // Certificate ID
-    lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 14, size: 4, font, color: lightGray })
+    lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 13, size: 3.5, font, color: lightGray })
 
     // ── Right side: QR code ──
-    const qrSize = 15
+    const qrSize = 13
     lastPage.drawImage(qrImage, {
-      x: sealX + sealW - qrSize - 5,
-      y: infoY - 4,
+      x: sealX + sealW - qrSize - 4,
+      y: infoY - 3,
       width: qrSize, height: qrSize,
     })
 
     // ── Footer ──
     const footerBarY = sealYPos
-    const footerBarH = 9
+    const footerBarH = 8
 
     // Footer text left
-    lastPage.drawText('Verifica ', { x: sealX + 5, y: footerBarY + 2.5, size: 3.5, font, color: lightGray })
-    lastPage.drawText('AuditTrail', { x: sealX + 5 + font.widthOfTextAtSize('Verifica ', 3.5), y: footerBarY + 2.5, size: 3.5, font: boldFont, color: darkGreen })
+    lastPage.drawText('Verifica ', { x: sealX + 4, y: footerBarY + 2, size: 3, font, color: lightGray })
+    lastPage.drawText('AuditTrail', { x: sealX + 4 + font.widthOfTextAtSize('Verifica ', 3), y: footerBarY + 2, size: 3, font: boldFont, color: darkGreen })
 
     // Footer Trustera logo right
     if (logoImage) {
-      const lH = 7
+      const lH = 6
       const lW = (logoImage.width / logoImage.height) * lH
       lastPage.drawImage(logoImage, {
-        x: sealX + sealW - lW - 5,
+        x: sealX + sealW - lW - 4,
         y: footerBarY + (footerBarH - lH) / 2,
         width: lW, height: lH,
       })

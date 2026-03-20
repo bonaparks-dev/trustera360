@@ -237,8 +237,8 @@ async function buildSignedPdf(
   const certId = `TR-${year}-${originalHash.slice(0, 8).toUpperCase()}`
 
   // Seal dimensions — compact to fit inside signature boxes
-  const sealW = 200
-  const sealH = 72
+  const sealW = 160
+  const sealH = 52
   const sealX = (lastW - sealW) / 2
   const sealY = 18
 
@@ -254,25 +254,25 @@ async function buildSignedPdf(
     color: rgb(1, 1, 1),
   })
 
-  // ── Header: big Trustera logo + "Verified Seal" ──
-  const headerY = sealY + sealH - 22
+  // ── Header: Trustera logo + "Verified Seal" ──
+  const headerY = sealY + sealH - 16
   if (logoImage) {
-    const hLogoH = 20
+    const hLogoH = 13
     const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-    lastPage.drawImage(logoImage, { x: sealX + 8, y: headerY - 2, width: hLogoW, height: hLogoH })
-    const vsX = sealX + 8 + hLogoW + 5
-    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 4, size: 7, font, color: lightGray })
+    lastPage.drawImage(logoImage, { x: sealX + 6, y: headerY - 1, width: hLogoW, height: hLogoH })
+    const vsX = sealX + 6 + hLogoW + 4
+    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 2, size: 6, font, color: lightGray })
   } else {
-    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 8, y: headerY + 4, size: 7, font: boldFont, color: gray })
+    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 6, y: headerY + 2, size: 6, font: boldFont, color: gray })
   }
 
   // ── Left side: signer info ──
-  const infoX = sealX + 8
-  const infoY = headerY - 14
+  const infoX = sealX + 6
+  const infoY = headerY - 12
 
   // Signer name(s) (bold)
   const allSignerNames = signers.map(s => s.name).join(', ') || 'Firmatario'
-  lastPage.drawText(allSignerNames, { x: infoX, y: infoY, size: 7.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+  lastPage.drawText(allSignerNames, { x: infoX, y: infoY, size: 6.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
 
   // Date + time
   const signDate = new Date(signers[0]?.signed_at || new Date().toISOString())
@@ -282,33 +282,33 @@ async function buildSignedPdf(
   const hh = String(signDate.getHours()).padStart(2, '0')
   const mi = String(signDate.getMinutes()).padStart(2, '0')
   const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
-  lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 9, size: 5.5, font, color: gray })
+  lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 8, size: 5, font, color: gray })
 
   // Certificate ID
-  lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 17, size: 5, font, color: lightGray })
+  lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 15, size: 4.5, font, color: lightGray })
 
-  // ── Right side: QR code (compact) ──
-  const qrSize = 18
+  // ── Right side: QR code ──
+  const qrSize = 16
   lastPage.drawImage(qrImage, {
-    x: sealX + sealW - qrSize - 10,
-    y: infoY - 6,
+    x: sealX + sealW - qrSize - 6,
+    y: infoY - 5,
     width: qrSize, height: qrSize,
   })
 
-  // ── Footer: white, no lines ──
+  // ── Footer ──
   const footerBarY = sealY
-  const footerBarH = 12
+  const footerBarH = 10
 
   // Footer text left
-  lastPage.drawText('Scansiona per verifica ', { x: sealX + 8, y: footerBarY + 3, size: 4.5, font, color: lightGray })
-  lastPage.drawText('AuditTrail', { x: sealX + 8 + font.widthOfTextAtSize('Scansiona per verifica ', 4.5), y: footerBarY + 3, size: 4.5, font: boldFont, color: darkGreen })
+  lastPage.drawText('Scansiona per verifica ', { x: sealX + 6, y: footerBarY + 3, size: 4, font, color: lightGray })
+  lastPage.drawText('AuditTrail', { x: sealX + 6 + font.widthOfTextAtSize('Scansiona per verifica ', 4), y: footerBarY + 3, size: 4, font: boldFont, color: darkGreen })
 
-  // Footer Trustera logo right (bigger)
+  // Footer Trustera logo right
   if (logoImage) {
-    const lH = 12
+    const lH = 8
     const lW = (logoImage.width / logoImage.height) * lH
     lastPage.drawImage(logoImage, {
-      x: sealX + sealW - lW - 8,
+      x: sealX + sealW - lW - 6,
       y: footerBarY + (footerBarH - lH) / 2,
       width: lW, height: lH,
     })

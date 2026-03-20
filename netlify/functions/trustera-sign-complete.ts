@@ -238,29 +238,31 @@ async function buildSignedPdf(
     color: rgb(1, 1, 1),
   })
 
-  // ── Header: Trustera logo + "Verified Seal" ──
-  const headerY = sealY + sealH - 11
-  let headerTextX = sealX + 6
+  // ── Header: big Trustera logo + "Verified Seal" ──
+  const headerY = sealY + sealH - 14
   if (logoImage) {
-    const hLogoH = 7
+    const hLogoH = 10
     const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-    lastPage.drawImage(logoImage, { x: sealX + 5, y: headerY - 1, width: hLogoW, height: hLogoH })
-    headerTextX = sealX + 7 + hLogoW + 2
+    lastPage.drawImage(logoImage, { x: sealX + 8, y: headerY - 1, width: hLogoW, height: hLogoH })
+    const vsX = sealX + 8 + hLogoW + 5
+    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 7, font, color: lightGray })
+  } else {
+    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 8, y: headerY + 1, size: 7, font: boldFont, color: gray })
   }
-  lastPage.drawText('Verified Seal', { x: headerTextX, y: headerY, size: 6, font, color: gray })
 
-  // Separator line
+  // Separator line — below header
+  const sepY = headerY - 5
   lastPage.drawLine({
-    start: { x: sealX + 5, y: headerY - 4 },
-    end: { x: sealX + sealW - 5, y: headerY - 4 },
+    start: { x: sealX + 8, y: sepY },
+    end: { x: sealX + sealW - 8, y: sepY },
     thickness: 0.4, color: lightGray,
   })
 
   // ── Left side: signer info ──
-  const infoX = sealX + 6
-  const infoY = headerY - 14
+  const infoX = sealX + 8
+  const infoY = sepY - 11
 
-  // Signer name(s) (bold) — show all signers
+  // Signer name(s) (bold)
   const allSignerNames = signers.map(s => s.name).join(', ') || 'Firmatario'
   lastPage.drawText(allSignerNames, { x: infoX, y: infoY, size: 7.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
 
@@ -272,38 +274,40 @@ async function buildSignedPdf(
   const hh = String(signDate.getHours()).padStart(2, '0')
   const mi = String(signDate.getMinutes()).padStart(2, '0')
   const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
-  lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 10, size: 6, font, color: gray })
+  lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 9, size: 5.5, font, color: gray })
 
   // Certificate ID
-  lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 19, size: 5.5, font, color: gray })
+  lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 17, size: 5, font, color: lightGray })
 
-  // ── Footer bar ──
-  const footerBarY = sealY
-  const footerBarH = 11
-
-  // ── Right side: QR code (small) ──
-  const qrSize = 22
+  // ── Right side: QR code (compact, within content area) ──
+  const qrSize = 18
+  const contentTopY = sepY - 3
   lastPage.drawImage(qrImage, {
-    x: sealX + sealW - qrSize - 8,
-    y: sealY + footerBarH + (sealH - footerBarH - qrSize) / 2,
+    x: sealX + sealW - qrSize - 10,
+    y: contentTopY - qrSize,
     width: qrSize, height: qrSize,
   })
-  lastPage.drawRectangle({
-    x: sealX, y: footerBarY, width: sealW, height: footerBarH,
-    color: rgb(0.97, 0.97, 0.97),
-    borderColor: rgb(0.88, 0.88, 0.88), borderWidth: 0.4,
+
+  // ── Footer: white bg, Trustera logo centered ──
+  const footerBarY = sealY
+  const footerBarH = 12
+  // Thin top line for footer
+  lastPage.drawLine({
+    start: { x: sealX + 8, y: footerBarY + footerBarH },
+    end: { x: sealX + sealW - 8, y: footerBarY + footerBarH },
+    thickness: 0.3, color: rgb(0.9, 0.9, 0.9),
   })
 
-  // "Scansiona per verifica AuditTrail"
-  lastPage.drawText('Scansiona per verifica ', { x: sealX + 5, y: footerBarY + 3.5, size: 4.5, font, color: gray })
-  lastPage.drawText('AuditTrail', { x: sealX + 5 + font.widthOfTextAtSize('Scansiona per verifica ', 4.5), y: footerBarY + 3.5, size: 4.5, font: boldFont, color: darkGreen })
+  // Footer text left
+  lastPage.drawText('Scansiona per verifica ', { x: sealX + 8, y: footerBarY + 3, size: 4.5, font, color: lightGray })
+  lastPage.drawText('AuditTrail', { x: sealX + 8 + font.widthOfTextAtSize('Scansiona per verifica ', 4.5), y: footerBarY + 3, size: 4.5, font: boldFont, color: darkGreen })
 
-  // Trustera logo bottom-right
+  // Footer Trustera logo right (bigger)
   if (logoImage) {
-    const lH = 7
+    const lH = 8
     const lW = (logoImage.width / logoImage.height) * lH
     lastPage.drawImage(logoImage, {
-      x: sealX + sealW - lW - 6,
+      x: sealX + sealW - lW - 8,
       y: footerBarY + (footerBarH - lH) / 2,
       width: lW, height: lH,
     })

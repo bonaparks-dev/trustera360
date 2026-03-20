@@ -19,6 +19,19 @@ const supabaseDR7 = createClient(
 
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
+async function logAudit(documentId: string, action: string, email?: string, ip?: string, userAgent?: string, metadata?: Record<string, any>) {
+  try {
+    await supabase.from('signature_audit_trail').insert({
+      document_id: documentId,
+      action,
+      signer_email: email || null,
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+      metadata: metadata || null,
+    })
+  } catch (e) { /* non-blocking */ }
+}
+
 async function sendSignedPdfEmail(
   to: string,
   documentName: string,
@@ -434,6 +447,9 @@ export const handler: Handler = async (event) => {
         throw signerUpdateError
       }
 
+      // Log signature applied
+      await logAudit(doc.id, 'signature_applied', signerRow.signer_email, ip, userAgent, { signer_name: signerRow.signer_name, signed_at: signedAt })
+
       // Save marketing consent to leads + marketing_consents tables
       await saveMarketingConsent(signerRow.signer_email, signerRow.signer_name, marketingConsent ?? false, 'signing_complete')
 
@@ -611,9 +627,11 @@ export const handler: Handler = async (event) => {
           if (channel === 'whatsapp' && s.signer_phone) {
             console.log('[trustera-sign-complete] Sending signed PDF via WhatsApp to:', s.signer_phone)
             await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
+            await logAudit(doc.id, 'signed_pdf_sent', s.signer_email, undefined, undefined, { channel: 'whatsapp', signer_name: s.signer_name })
           } else if (s.signer_email) {
             console.log('[trustera-sign-complete] Sending signed PDF via email to:', s.signer_email)
             await sendSignedPdfEmail(s.signer_email, doc.name, s.signer_name, signedPdfBuffer, false)
+            await logAudit(doc.id, 'signed_pdf_sent', s.signer_email, undefined, undefined, { channel: 'email', signer_name: s.signer_name })
           } else {
             console.warn('[trustera-sign-complete] Signer has no email or phone, skipping:', s.signer_name)
           }
@@ -677,6 +695,14 @@ export const handler: Handler = async (event) => {
           }
         }
       }
+
+      // Log signing completed
+      await logAudit(doc.id, 'signing_completed', undefined, ip, userAgent, {
+        signed_at: signedAt,
+        original_pdf_hash: originalHash,
+        signed_pdf_url: publicUrl,
+        signers: allSigners.map((s: any) => ({ name: s.signer_name, email: s.signer_email }))
+      })
 
       console.log('[trustera-sign-complete] All signers done for doc:', doc.id, '— signed PDF uploaded:', fileName)
 

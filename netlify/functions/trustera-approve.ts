@@ -11,6 +11,19 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 
 const SITE_URL = process.env.SITE_URL || 'https://trustera360.app'
 
+async function logAudit(documentId: string, action: string, email?: string, ip?: string, userAgent?: string, metadata?: Record<string, any>) {
+  try {
+    await supabase.from('signature_audit_trail').insert({
+      document_id: documentId,
+      action,
+      signer_email: email || null,
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+      metadata: metadata || null,
+    })
+  } catch (e) { /* non-blocking */ }
+}
+
 function buildRejectionNotificationHtml(
   ownerName: string,
   approverName: string,
@@ -168,6 +181,7 @@ export const handler: Handler = async (event) => {
         }
       }
 
+      await logAudit(matchedDoc.id, 'approval_rejected', matchedApprover.email, undefined, undefined, { approver_name: matchedApprover.name, reason: reason || null })
       console.log('[trustera-approve] Document rejected by', matchedApprover.email, 'doc:', matchedDoc.id)
 
       return {
@@ -196,6 +210,7 @@ export const handler: Handler = async (event) => {
     const allApproved = updatedApprovers.every((a: any) => a.status === 'approved')
 
     if (!allApproved) {
+      await logAudit(matchedDoc.id, 'approval_approved', matchedApprover.email, undefined, undefined, { approver_name: matchedApprover.name, all_approved: false })
       console.log('[trustera-approve] Waiting for more approvals, doc:', matchedDoc.id)
       return {
         statusCode: 200,
@@ -256,6 +271,7 @@ export const handler: Handler = async (event) => {
       throw finalUpdateError
     }
 
+    await logAudit(matchedDoc.id, 'approval_approved', matchedApprover.email, undefined, undefined, { approver_name: matchedApprover.name, all_approved: true })
     console.log('[trustera-approve] All approvers approved, signing links sent for doc:', matchedDoc.id)
 
     return {

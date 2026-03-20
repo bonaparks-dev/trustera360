@@ -148,3 +148,26 @@ ALTER TABLE trustera_documents
 CREATE INDEX IF NOT EXISTS idx_trustera_documents_approval_status
   ON trustera_documents (approval_status)
   WHERE approval_status IS NOT NULL;
+
+-- 11. signature_audit_trail table (complete audit trail for document signing)
+CREATE TABLE IF NOT EXISTS signature_audit_trail (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  document_id uuid NOT NULL,
+  action text NOT NULL,
+  signer_email text,
+  ip_address text,
+  user_agent text,
+  metadata jsonb,
+  created_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE signature_audit_trail ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Service role full access on signature_audit_trail"
+  ON signature_audit_trail FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+CREATE INDEX IF NOT EXISTS idx_signature_audit_trail_document_id
+  ON signature_audit_trail (document_id);
+CREATE INDEX IF NOT EXISTS idx_signature_audit_trail_action
+  ON signature_audit_trail (action);

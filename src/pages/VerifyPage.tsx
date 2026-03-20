@@ -32,17 +32,52 @@ interface VerificationData {
 
 function formatAction(action: string): string {
   const map: Record<string, string> = {
-    otp_sent: 'OTP inviato',
-    otp_verified: 'OTP verificato',
-    document_opened: 'Documento aperto',
+    otp_sent: 'Codice OTP inviato',
+    otp_verified: 'Identità verificata (OTP)',
+    otp_failed: 'Tentativo OTP fallito',
+    otp_expired: 'Codice OTP scaduto',
+    document_opened: 'Documento aperto dal firmatario',
     document_viewed: 'Documento visualizzato',
     signature_applied: 'Firma applicata',
     document_signed: 'Documento firmato',
-    signing_completed: 'Firma completata',
-    email_sent: 'Email inviata',
-    whatsapp_sent: 'WhatsApp inviato',
+    signing_completed: 'Processo di firma completato',
+    email_sent: 'Richiesta di firma inviata via Email',
+    whatsapp_sent: 'Richiesta di firma inviata via WhatsApp',
+    signed_pdf_sent: 'PDF firmato consegnato',
+    approval_requested: 'Richiesta di approvazione inviata',
+    approval_approved: 'Documento approvato',
+    approval_rejected: 'Documento rifiutato',
   }
   return map[action] || action.replace(/_/g, ' ')
+}
+
+function actionIcon(action: string): string {
+  const icons: Record<string, string> = {
+    otp_sent: '🔐',
+    otp_verified: '✅',
+    otp_failed: '❌',
+    otp_expired: '⏰',
+    document_opened: '📄',
+    document_viewed: '👁',
+    signature_applied: '✍️',
+    document_signed: '📝',
+    signing_completed: '🏁',
+    email_sent: '📧',
+    whatsapp_sent: '💬',
+    signed_pdf_sent: '📤',
+    approval_requested: '🔔',
+    approval_approved: '👍',
+    approval_rejected: '👎',
+  }
+  return icons[action] || '•'
+}
+
+function actionColor(action: string): string {
+  if (['otp_verified', 'signature_applied', 'signing_completed', 'approval_approved'].includes(action)) return 'bg-green-500'
+  if (['otp_failed', 'otp_expired', 'approval_rejected'].includes(action)) return 'bg-red-400'
+  if (['email_sent', 'whatsapp_sent', 'signed_pdf_sent'].includes(action)) return 'bg-blue-400'
+  if (['document_opened', 'document_viewed'].includes(action)) return 'bg-gray-400'
+  return 'bg-green-500'
 }
 
 function parseBrowser(ua: string): string {
@@ -227,23 +262,47 @@ export default function VerifyPage() {
                 </svg>
               </button>
               {showAuditTrail && (
-                <div className="mt-3 relative pl-4 border-l-2 border-green-200 space-y-4">
-                  {data.auditTrail.map((evt, i) => (
-                    <div key={i} className="relative">
-                      <div className="absolute -left-[21px] w-3 h-3 rounded-full bg-green-500 border-2 border-white" />
-                      <div className="ml-2">
-                        <p className="text-sm font-medium text-gray-800">{formatAction(evt.action)}</p>
-                        <p className="text-xs text-gray-400">{fmtDateShort(evt.timestamp)}</p>
-                        {evt.email && <p className="text-xs text-gray-500">{evt.email}</p>}
-                        {evt.ip && <p className="text-[10px] text-gray-400 font-mono">IP: {evt.ip}</p>}
-                        {evt.userAgent && (
-                          <p className="text-[10px] text-gray-400">
-                            {[parseBrowser(evt.userAgent), parseOS(evt.userAgent)].filter(Boolean).join(' / ')}
-                          </p>
-                        )}
+                <div className="mt-3 relative pl-5 border-l-2 border-gray-200 space-y-4">
+                  {data.auditTrail.map((evt, i) => {
+                    const color = actionColor(evt.action)
+                    const icon = actionIcon(evt.action)
+                    const browser = parseBrowser(evt.userAgent)
+                    const os = parseOS(evt.userAgent)
+                    const deviceInfo = [browser, os].filter(Boolean).join(' / ')
+                    const signerName = evt.metadata?.signer_name || evt.metadata?.approver_name || ''
+                    const channel = evt.metadata?.channel || ''
+                    return (
+                      <div key={i} className="relative">
+                        <div className={`absolute -left-[23px] w-3.5 h-3.5 rounded-full ${color} border-2 border-white flex items-center justify-center`} />
+                        <div className="ml-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{icon}</span>
+                            <p className="text-sm font-medium text-gray-800">{formatAction(evt.action)}</p>
+                          </div>
+                          <div className="ml-6 space-y-0.5">
+                            <p className="text-xs text-gray-400">{fmtDateShort(evt.timestamp)}</p>
+                            {(evt.email || signerName) && (
+                              <p className="text-xs text-gray-600">
+                                {signerName && <span className="font-medium">{signerName}</span>}
+                                {signerName && evt.email && ' — '}
+                                {evt.email && <span>{evt.email}</span>}
+                              </p>
+                            )}
+                            {channel && (
+                              <p className="text-[10px] text-gray-400">
+                                Canale: {channel === 'whatsapp' ? 'WhatsApp' : channel === 'email' ? 'Email' : channel}
+                              </p>
+                            )}
+                            {evt.ip && <p className="text-[10px] text-gray-400 font-mono">IP: {evt.ip}</p>}
+                            {deviceInfo && <p className="text-[10px] text-gray-400">{deviceInfo}</p>}
+                            {evt.metadata?.reason && (
+                              <p className="text-[10px] text-red-500">Motivo: {evt.metadata.reason}</p>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>

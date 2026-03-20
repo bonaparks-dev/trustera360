@@ -11,6 +11,19 @@ const resend = new Resend(process.env.RESEND_API_KEY!)
 
 const SITE_URL = process.env.SITE_URL || 'https://trustera360.app'
 
+async function logAudit(documentId: string, action: string, email?: string, ip?: string, userAgent?: string, metadata?: Record<string, any>) {
+  try {
+    await supabase.from('signature_audit_trail').insert({
+      document_id: documentId,
+      action,
+      signer_email: email || null,
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+      metadata: metadata || null,
+    })
+  } catch (e) { /* non-blocking */ }
+}
+
 function cleanPhone(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, '')
   if (cleaned.startsWith('+')) return cleaned.slice(1)
@@ -293,6 +306,7 @@ export async function processSendSigners(
     const channel = signer.channel || 'email'
     if (channel === 'whatsapp' && signer.phone) {
       await sendWhatsAppSigningLink(signer.phone, signer.name, senderName, doc.name, signingUrl)
+      await logAudit(documentId, 'whatsapp_sent', signer.email, undefined, undefined, { channel: 'whatsapp', phone: signer.phone, signer_name: signer.name })
     } else {
       try {
         await resend.emails.send({
@@ -303,6 +317,7 @@ export async function processSendSigners(
           text: `Ciao ${signer.name},\n\n${senderName} ti ha inviato un documento da firmare: ${doc.name}\n\nClicca qui per visualizzare e firmare il documento:\n${signingUrl}\n\nQuesto link scade tra 12 ore.\n\nTrustera - Infrastructure for Digital Trust\nhttps://trustera360.app`,
           html: buildSigningEmailHtml(signer.name, senderName, doc.name, signingUrl)
         })
+        await logAudit(documentId, 'email_sent', signer.email, undefined, undefined, { channel: 'email', signer_name: signer.name })
       } catch (emailErr: any) {
         console.error('[trustera-send-signing] Email send failed for', signer.email, ':', emailErr.message)
         throw emailErr
@@ -408,6 +423,7 @@ export const handler: Handler = async (event) => {
             html: buildApprovalEmailHtml(approver.name, senderName, doc.name, signerNames, approveUrl, rejectUrl)
           })
           console.log('[trustera-send-signing] Approval email sent to:', approver.email)
+          await logAudit(documentId, 'approval_requested', approver.email, undefined, undefined, { approver_name: approver.name })
         } catch (err: any) {
           console.warn('[trustera-send-signing] Approval email failed for', approver.email, ':', err.message)
         }

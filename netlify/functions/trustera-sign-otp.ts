@@ -9,6 +9,19 @@ const supabase = createClient(
 )
 const resend = new Resend(process.env.RESEND_API_KEY!)
 
+async function logAudit(documentId: string, action: string, email?: string, ip?: string, userAgent?: string, metadata?: Record<string, any>) {
+  try {
+    await supabase.from('signature_audit_trail').insert({
+      document_id: documentId,
+      action,
+      signer_email: email || null,
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+      metadata: metadata || null,
+    })
+  } catch (e) { /* non-blocking */ }
+}
+
 function cleanPhoneForChatId(phone: string): string {
   let cleaned = phone.replace(/[\s\-\(\)]/g, '')
   if (cleaned.startsWith('+')) return cleaned.slice(1)
@@ -174,6 +187,11 @@ export const handler: Handler = async (event) => {
           return { statusCode: 500, body: JSON.stringify({ error: "Nessun canale disponibile per l'invio del codice OTP" }) }
         }
       }
+
+      // Log OTP sent audit event
+      const ip = event.headers['x-forwarded-for']?.split(',')[0].trim() || event.headers['client-ip'] || ''
+      const ua = event.headers['user-agent'] || ''
+      await logAudit(signerRow.document_id, 'otp_sent', signerRow.signer_email, ip, ua, { channel, otp_expires_at: otpExpires })
 
       return { statusCode: 200, body: JSON.stringify({ success: true, channel }) }
     }

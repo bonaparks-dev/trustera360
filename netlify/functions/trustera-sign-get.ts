@@ -6,6 +6,19 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function logAudit(documentId: string, action: string, email?: string, ip?: string, userAgent?: string, metadata?: Record<string, any>) {
+  try {
+    await supabase.from('signature_audit_trail').insert({
+      document_id: documentId,
+      action,
+      signer_email: email || null,
+      ip_address: ip || null,
+      user_agent: userAgent || null,
+      metadata: metadata || null,
+    })
+  } catch (e) { /* non-blocking */ }
+}
+
 async function createSignedStorageUrl(rawUrl: string): Promise<string> {
   const match = rawUrl.match(/\/storage\/v1\/object\/(?:public|sign)\/trustera\/(.+)/)
   if (!match) return rawUrl
@@ -77,6 +90,13 @@ export const handler: Handler = async (event) => {
         .eq('signer_id', signerRow.id)
         .order('page_number', { ascending: true })
         .order('sort_order', { ascending: true })
+
+      // Log document opened event
+      const ip = event.headers['x-forwarded-for']?.split(',')[0].trim() || event.headers['client-ip'] || ''
+      const userAgent = event.headers['user-agent'] || ''
+      if (signerRow.status !== 'signed') {
+        await logAudit(doc.id, 'document_opened', signerRow.signer_email, ip, userAgent, { signer_name: signerRow.signer_name })
+      }
 
       const response: Record<string, any> = {
         signerName: signerRow.signer_name,

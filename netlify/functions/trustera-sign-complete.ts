@@ -235,7 +235,7 @@ async function buildSignedPdf(
 
   // Seal dimensions — compact to fit inside signature boxes
   const sealW = 190
-  const sealH = 58
+  const sealH = 64
   const sealX = (lastW - sealW) / 2
   const sealY = 18
 
@@ -252,15 +252,15 @@ async function buildSignedPdf(
   })
 
   // ── Header: big Trustera logo + "Verified Seal" ──
-  const headerY = sealY + sealH - 14
+  const headerY = sealY + sealH - 18
   if (logoImage) {
-    const hLogoH = 10
+    const hLogoH = 16
     const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-    lastPage.drawImage(logoImage, { x: sealX + 8, y: headerY - 1, width: hLogoW, height: hLogoH })
+    lastPage.drawImage(logoImage, { x: sealX + 8, y: headerY - 2, width: hLogoW, height: hLogoH })
     const vsX = sealX + 8 + hLogoW + 5
-    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 7, font, color: lightGray })
+    lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 2, size: 7, font, color: lightGray })
   } else {
-    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 8, y: headerY + 1, size: 7, font: boldFont, color: gray })
+    lastPage.drawText('Trustera  Verified Seal', { x: sealX + 8, y: headerY + 2, size: 7, font: boldFont, color: gray })
   }
 
   // ── Left side: signer info ──
@@ -302,7 +302,7 @@ async function buildSignedPdf(
 
   // Footer Trustera logo right (bigger)
   if (logoImage) {
-    const lH = 8
+    const lH = 10
     const lW = (logoImage.width / logoImage.height) * lH
     lastPage.drawImage(logoImage, {
       x: sealX + sealW - lW - 8,

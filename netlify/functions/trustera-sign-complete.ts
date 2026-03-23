@@ -466,8 +466,7 @@ export const handler: Handler = async (event) => {
           signed_at: signedAt,
           signing_ip: ip,
           signing_user_agent: userAgent,
-          marketing_consent: marketingConsent ?? false,
-          otp_verified: false
+          marketing_consent: marketingConsent ?? false
         })
         .eq('id', signerRow.id)
 
@@ -836,7 +835,6 @@ export const handler: Handler = async (event) => {
         signing_ip: ip,
         signing_user_agent: userAgent,
         pdf_hash: originalHash,
-        otp_verified: false,
         signing_token: null
       })
       .eq('id', doc.id)

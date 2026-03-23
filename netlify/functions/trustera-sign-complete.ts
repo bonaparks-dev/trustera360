@@ -733,14 +733,16 @@ export const handler: Handler = async (event) => {
         signers: allSigners.map((s: any) => ({ name: s.signer_name, email: s.signer_email }))
       })
 
-      // Send a copy of signed PDF to owner via WhatsApp
-      const ownerWhatsAppNumber = process.env.TRUSTERA_OWNER_WHATSAPP || '393457905205'
-      try {
-        const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
-        await sendWhatsAppPdf(ownerWhatsAppNumber, publicUrl, doc.name, signerNamesList)
-        console.log('[trustera-sign-complete] Owner WhatsApp copy sent to:', ownerWhatsAppNumber)
-      } catch (ownerWaErr: any) {
-        console.warn('[trustera-sign-complete] Owner WhatsApp copy failed:', ownerWaErr.message)
+      // Send a copy of signed PDF to owner via WhatsApp (DR7 contracts only)
+      if (doc.source && doc.source.startsWith('dr7')) {
+        const ownerWhatsAppNumber = process.env.TRUSTERA_OWNER_WHATSAPP || '393457905205'
+        try {
+          const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
+          await sendWhatsAppPdf(ownerWhatsAppNumber, publicUrl, doc.name, signerNamesList)
+          console.log('[trustera-sign-complete] Owner WhatsApp copy sent to:', ownerWhatsAppNumber)
+        } catch (ownerWaErr: any) {
+          console.warn('[trustera-sign-complete] Owner WhatsApp copy failed:', ownerWaErr.message)
+        }
       }
 
       console.log('[trustera-sign-complete] All signers done for doc:', doc.id, '— signed PDF uploaded:', fileName)

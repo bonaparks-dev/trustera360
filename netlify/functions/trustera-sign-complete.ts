@@ -107,9 +107,21 @@ function cleanPhoneForChatId(phone: string): string {
   return cleaned
 }
 
-async function sendWhatsAppPdf(phone: string, publicUrl: string, documentName: string, signerName: string): Promise<void> {
-  const idInstance = process.env.GREEN_API_INSTANCE_ID
-  const apiToken = process.env.GREEN_API_TOKEN
+async function sendWhatsAppPdf(phone: string, publicUrl: string, documentName: string, signerName: string, source?: string): Promise<void> {
+  // Use DR7's Green API for DR7-sourced documents (same number that sent the signing link)
+  // Use Trustera's Green API for everything else
+  let idInstance: string | undefined
+  let apiToken: string | undefined
+
+  if (source && source.startsWith('dr7') && process.env.DR7_GREEN_API_INSTANCE_ID && process.env.DR7_GREEN_API_TOKEN) {
+    idInstance = process.env.DR7_GREEN_API_INSTANCE_ID
+    apiToken = process.env.DR7_GREEN_API_TOKEN
+    console.log('[trustera-sign-complete] Using DR7 Green API for WhatsApp (same conversation)')
+  } else {
+    idInstance = process.env.GREEN_API_INSTANCE_ID
+    apiToken = process.env.GREEN_API_TOKEN
+  }
+
   if (!idInstance || !apiToken) {
     console.warn('[trustera-sign-complete] GREEN_API credentials missing, cannot send WhatsApp PDF')
     return
@@ -654,7 +666,7 @@ export const handler: Handler = async (event) => {
           const channel = (s as any).notification_channel || 'email'
           if (channel === 'whatsapp' && s.signer_phone) {
             console.log('[trustera-sign-complete] Sending signed PDF via WhatsApp to:', s.signer_phone)
-            await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name)
+            await sendWhatsAppPdf(s.signer_phone, publicUrl, doc.name, s.signer_name, doc.source)
             await logAudit(doc.id, 'signed_pdf_sent', s.signer_email, undefined, undefined, { channel: 'whatsapp', signer_name: s.signer_name })
           } else if (s.signer_email) {
             console.log('[trustera-sign-complete] Sending signed PDF via email to:', s.signer_email)
@@ -733,10 +745,12 @@ export const handler: Handler = async (event) => {
       })
 
       // Send a copy of signed PDF to owner via WhatsApp (DR7 contracts only)
+      // Uses Trustera's Green API (not DR7's) since DR7's Green API can't send to its own number
       if (doc.source && doc.source.startsWith('dr7')) {
         const ownerWhatsAppNumber = process.env.TRUSTERA_OWNER_WHATSAPP || '393457905205'
         try {
           const signerNamesList = allSigners.map((s: any) => s.signer_name).join(', ')
+          // Pass no source so it uses Trustera's Green API for the owner copy
           await sendWhatsAppPdf(ownerWhatsAppNumber, publicUrl, doc.name, signerNamesList)
           console.log('[trustera-sign-complete] Owner WhatsApp copy sent to:', ownerWhatsAppNumber)
         } catch (ownerWaErr: any) {
@@ -877,7 +891,7 @@ export const handler: Handler = async (event) => {
     // Send signed PDF to signer via the channel chosen by the sender
     const channel = doc.notification_channel || 'email'
     if (channel === 'whatsapp' && doc.signer_phone) {
-      await sendWhatsAppPdf(doc.signer_phone, publicUrl, doc.name, doc.signer_name)
+      await sendWhatsAppPdf(doc.signer_phone, publicUrl, doc.name, doc.signer_name, doc.source)
     } else if (doc.signer_email) {
       await sendSignedPdfEmail(doc.signer_email, doc.name, doc.signer_name, signedPdfBuffer, false)
     }

@@ -372,9 +372,9 @@ export const handler: Handler = async (event) => {
             }
         }
 
-        // Send signed document via WhatsApp
-        const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
-        const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
+        // Send signed document via WhatsApp using DR7's Green API (same conversation as signing link)
+        const GREEN_API_INSTANCE_ID = process.env.DR7_GREEN_API_INSTANCE_ID || process.env.GREEN_API_INSTANCE_ID
+        const GREEN_API_TOKEN = process.env.DR7_GREEN_API_TOKEN || process.env.GREEN_API_TOKEN
         if (GREEN_API_INSTANCE_ID && GREEN_API_TOKEN && signedPdfUrl) {
             try {
                 let customerPhone = sigRequest.signer_phone || ''

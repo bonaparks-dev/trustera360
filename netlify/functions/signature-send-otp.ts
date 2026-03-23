@@ -8,8 +8,9 @@ const supabase = createClient(
     process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const GREEN_API_INSTANCE_ID = process.env.GREEN_API_INSTANCE_ID
-const GREEN_API_TOKEN = process.env.GREEN_API_TOKEN
+// Use DR7's Green API for DR7 signing flow (same number that sent the signing link)
+const GREEN_API_INSTANCE_ID = process.env.DR7_GREEN_API_INSTANCE_ID || process.env.GREEN_API_INSTANCE_ID
+const GREEN_API_TOKEN = process.env.DR7_GREEN_API_TOKEN || process.env.GREEN_API_TOKEN
 
 const OTP_EXPIRY_MINUTES = 10
 const MAX_OTP_ATTEMPTS = 5

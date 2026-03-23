@@ -852,6 +852,25 @@ export default function DashboardPage({ session }: { session: Session }) {
 
   // ── Document trash / restore ─────────────────────────────────────────────
 
+  async function handleCancelSigning(docId: string) {
+    if (!confirm('Annullare la richiesta di firma? I link inviati ai firmatari non saranno più validi.')) return
+    // Invalidate all signer tokens by clearing them
+    const { error: signerErr } = await supabase
+      .from('trustera_document_signers')
+      .update({ signing_token: null, signing_token_expires_at: new Date().toISOString(), status: 'cancelled' })
+      .eq('document_id', docId)
+    const { error: docErr } = await supabase
+      .from('trustera_documents')
+      .update({ status: 'draft' })
+      .eq('id', docId)
+    if (signerErr || docErr) {
+      toast.error('Errore nell\'annullamento')
+    } else {
+      toast.success('Richiesta di firma annullata. I link non sono più validi.')
+      loadDocuments()
+    }
+  }
+
   async function handleTrashDocument(docId: string) {
     const { error } = await supabase
       .from('trustera_documents')
@@ -1539,6 +1558,17 @@ export default function DashboardPage({ session }: { session: Session }) {
                               >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                                </svg>
+                              </button>
+                            )}
+                            {doc.status === 'pending' && (
+                              <button
+                                onClick={e => { e.stopPropagation(); handleCancelSigning(doc.id) }}
+                                className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-500 transition-colors"
+                                title="Annulla richiesta di firma"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
                                 </svg>
                               </button>
                             )}

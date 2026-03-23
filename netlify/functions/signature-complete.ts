@@ -426,6 +426,34 @@ export const handler: Handler = async (event) => {
             } catch (waErr: any) {
                 console.error('[signature-complete] WhatsApp send failed:', waErr.message)
             }
+
+            // Also send a copy to owner via Trustera's Green API (arrives in Trustera chat)
+            const TRUSTERA_INSTANCE = process.env.GREEN_API_INSTANCE_ID
+            const TRUSTERA_TOKEN = process.env.GREEN_API_TOKEN
+            const ownerPhone = process.env.TRUSTERA_OWNER_WHATSAPP || '393457905205'
+            if (TRUSTERA_INSTANCE && TRUSTERA_TOKEN && TRUSTERA_INSTANCE !== GREEN_API_INSTANCE_ID) {
+                try {
+                    const trusteraUrl = `https://api.green-api.com/waInstance${TRUSTERA_INSTANCE}/sendFileByUrl/${TRUSTERA_TOKEN}`
+                    const ownerRes = await fetch(trusteraUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chatId: `${ownerPhone}@c.us`,
+                            urlFile: signedPdfUrl,
+                            fileName: `${docIdentifier}_firmato.pdf`,
+                            caption: `✅ Contratto ${docIdentifier} firmato da ${sigRequest.signer_name || 'cliente'}`
+                        })
+                    })
+                    const ownerResult = await ownerRes.json()
+                    if (ownerRes.ok && ownerResult.idMessage) {
+                        console.log('[signature-complete] Owner copy sent via Trustera WhatsApp:', ownerResult.idMessage)
+                    } else {
+                        console.warn('[signature-complete] Trustera owner copy failed:', ownerResult)
+                    }
+                } catch (ownerErr: any) {
+                    console.warn('[signature-complete] Trustera owner copy error:', ownerErr.message)
+                }
+            }
         }
 
         // Dual-write to Trustera Supabase — copy signed document + marketing consent

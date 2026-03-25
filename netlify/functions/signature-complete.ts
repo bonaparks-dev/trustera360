@@ -184,7 +184,7 @@ export const handler: Handler = async (event) => {
             // ── FIRMA LOCATORE seal (always drawn for DR7 contracts) ──
             if (contract) {
                 const locSealX = 40  // Left side of LOCATORE column
-                const locSealY = 130 // Inside LOCATORE box
+                const locSealY = 160 // Middle of LOCATORE box
 
                 // Draw seal for Ilenia Campagnola
                 sealPage.drawRectangle({
@@ -230,10 +230,10 @@ export const handler: Handler = async (event) => {
             let sealYPos: number
             if (signerIndex === 0) {
                 sealX = 280   // Center of 1° guidatore: (248+438)/2 - 65
-                sealYPos = 130 // Inside three-column row
+                sealYPos = 160 // Middle of three-column row
             } else if (signerIndex === 1) {
                 sealX = 437   // Center of 2° guidatore: (438+567)/2 - 65
-                sealYPos = 130 // Inside three-column row
+                sealYPos = 160 // Middle of three-column row
             } else {
                 sealX = (pageWidth - sealW) / 2  // Centered for garante
                 sealYPos = 45  // Inside garante row

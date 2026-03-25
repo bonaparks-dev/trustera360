@@ -262,7 +262,7 @@ async function buildSignedPdf(
   if (source && source.startsWith('dr7')) {
     try {
       const locSealX = 40
-      const locSealY = 130
+      const locSealY = 160
 
       lastPage.drawRectangle({
         x: locSealX, y: locSealY, width: sealW, height: sealH,
@@ -306,9 +306,9 @@ async function buildSignedPdf(
   // Three-column row y≈105-235, garante row y≈30-105
   function getSealPosition(signerIndex: number): { x: number; y: number } {
     if (signerIndex === 0) {
-      return { x: 280, y: 130 }   // Center of 1° guidatore
+      return { x: 280, y: 160 }   // Center of 1° guidatore
     } else if (signerIndex === 1) {
-      return { x: 437, y: 130 }   // Center of 2° guidatore
+      return { x: 437, y: 160 }   // Center of 2° guidatore
     } else {
       return { x: (lastW - sealW) / 2, y: 45 }  // Inside garante row
     }

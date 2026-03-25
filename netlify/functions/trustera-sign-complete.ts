@@ -249,7 +249,7 @@ async function buildSignedPdf(
   if (source && source.startsWith('dr7')) {
     try {
       const locX = 40
-      let locY = 108
+      let locY = 200 // Inside FIRMA LOCATORE box, below the header
       const locFontSize = 6.5
       const locSmallSize = 5.5
       const dkGray = rgb(0.15, 0.15, 0.15)
@@ -293,35 +293,33 @@ async function buildSignedPdf(
   // 1 signer → center of "1° guidatore" column
   // 2 signers → 1st in "1° guidatore", 2nd in "2° guidatore"
   // 3+ signers → spread evenly across page
-  function getSealX(signerIndex: number, totalSigners: number): number {
-    if (totalSigners === 1) {
-      // Center of "1° guidatore" column: (195 + 395) / 2 - sealW/2
-      return 220
-    } else if (totalSigners === 2) {
-      // 1st driver column center, then 2nd driver column center
-      return signerIndex === 0 ? 220 : 420
+  // Contract last page layout (A4 = 595pt, y=0 at bottom):
+  //   Row 1 (y≈40–140): FIRMA LOCATORE (x 28–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
+  //   Row 2 (y≈0–40):   Firma del garante (full width x 28–567)
+  // Seal (130×42) centered in each box, placed in lower portion
+  function getSealPosition(signerIndex: number): { x: number; y: number } {
+    if (signerIndex === 0) {
+      return { x: 233, y: 55 }   // Center of 1° guidatore column
+    } else if (signerIndex === 1) {
+      return { x: 412, y: 55 }   // Center of 2° guidatore column
     } else {
-      // Spread evenly, skip FIRMA LOCATORE area
-      const usableStart = 195
-      const usableWidth = lastW - usableStart - 10
-      const spacing = usableWidth / totalSigners
-      return usableStart + spacing * signerIndex + (spacing - sealW) / 2
+      return { x: (lastW - sealW) / 2, y: 5 }  // Garante row (centered)
     }
   }
 
   for (let si = 0; si < signers.length; si++) {
     const signer = signers[si]
-    const sealX = getSealX(si, signers.length)
+    const { x: sealX, y: sealY } = getSealPosition(si)
 
     // Outer rectangle (white background, light gray border)
     lastPage.drawRectangle({
-      x: sealX, y: sealYPos, width: sealW, height: sealH,
+      x: sealX, y: sealY, width: sealW, height: sealH,
       borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
       color: rgb(1, 1, 1),
     })
 
     // ── Header: Trustera logo + "Verified Seal" ──
-    const headerY = sealYPos + sealH - 12
+    const headerY = sealY + sealH - 12
     if (logoImage) {
       const hLogoH = 9
       const hLogoW = (logoImage.width / logoImage.height) * hLogoH
@@ -362,7 +360,7 @@ async function buildSignedPdf(
     })
 
     // ── Footer ──
-    const footerBarY = sealYPos
+    const footerBarY = sealY
     const footerBarH = 8
 
     // Footer text left

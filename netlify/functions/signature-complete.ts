@@ -2,6 +2,7 @@ import { Handler } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import QRCode from 'qrcode'
 // DR7 Supabase — primary (signature_requests, contracts, bookings, customers_extended)
 const supabase = createClient(
     process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
@@ -137,7 +138,7 @@ export const handler: Handler = async (event) => {
                 // FIRMA LOCATORE column is roughly x=30 to x=195 on A4 (595pt wide)
                 // Position text inside the box, below the "FIRMA LOCATORE" header
                 const locX = 40
-                let locY = 108 // Start below the "FIRMA LOCATORE" text
+                let locY = 200 // Inside FIRMA LOCATORE box, below the header
 
                 const locFontSize = 6.5
                 const locSmallSize = 5.5
@@ -189,6 +190,136 @@ export const handler: Handler = async (event) => {
             }
         }
 
+        // ── Trustera Verified Seal with QR code on last page ──
+        {
+            const verifyUrl = `https://trustera360.app/verify/${currentHash}`
+            const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 300, margin: 1 })
+            const qrImage = await pdfDoc.embedPng(qrPng)
+
+            // Embed Trustera logo
+            let logoImage: any = null
+            try {
+                const logoResp = await fetch('https://trustera360.app/trustera-logo.png')
+                if (logoResp.ok) {
+                    logoImage = await pdfDoc.embedPng(new Uint8Array(await logoResp.arrayBuffer()))
+                }
+            } catch (e) {
+                console.warn('[signature-complete] Could not embed logo:', e)
+            }
+
+            const pages = pdfDoc.getPages()
+            const sealPage = pages[pages.length - 1]
+            const { width: pageWidth } = sealPage.getSize()
+
+            const certId = `TR-${new Date().getFullYear()}-${currentHash.slice(0, 8).toUpperCase()}`
+
+            // Seal dimensions — compact to fit inside contract signature boxes
+            const sealW = 130
+            const sealH = 42
+
+            const darkGreen = rgb(0.06, 0.35, 0.18)
+            const sealGray = rgb(0.35, 0.35, 0.35)
+            const sealLightGray = rgb(0.75, 0.75, 0.75)
+
+            // Determine signer position: count previous signed requests for same contract
+            // A4 = 595pt. Contract last page layout:
+            //   Row 1: FIRMA LOCATORE (~0-195) | 1° guidatore (~195-395) | 2° guidatore (~395-595)
+            //   Row 2: Garante (full width, lower on page)
+            let signerIndex = 0
+            if (sigRequest.contract_id) {
+                const { data: allRequests } = await supabase
+                    .from('signature_requests')
+                    .select('id, created_at')
+                    .eq('contract_id', sigRequest.contract_id)
+                    .in('status', ['signed', 'otp_verified', 'otp_sent', 'pending'])
+                    .order('created_at', { ascending: true })
+                if (allRequests) {
+                    signerIndex = allRequests.findIndex((r: any) => r.id === sigRequest.id)
+                    if (signerIndex < 0) signerIndex = 0
+                }
+                console.log(`[signature-complete] Signer index: ${signerIndex} of ${allRequests?.length || 1} for contract ${sigRequest.contract_id}`)
+            }
+
+            // Contract last page layout (A4 = 595pt, y=0 at bottom):
+            //   Row 1 (y≈40–140): FIRMA LOCATORE (x 28–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
+            //   Row 2 (y≈0–40):   Firma del garante (full width x 28–567)
+            // Seal (130×42) centered in each box, placed in lower portion
+            let sealX: number
+            let sealYPos: number
+            if (signerIndex === 0) {
+                sealX = 233   // Center of 1° guidatore column: (208+388)/2 - 65
+                sealYPos = 55  // Lower half of Row 1
+            } else if (signerIndex === 1) {
+                sealX = 412   // Center of 2° guidatore column: (388+567)/2 - 65
+                sealYPos = 55  // Lower half of Row 1
+            } else {
+                sealX = (pageWidth - sealW) / 2  // Centered for garante
+                sealYPos = 5   // Inside garante row (Row 2)
+            }
+
+            // Outer rectangle
+            sealPage.drawRectangle({
+                x: sealX, y: sealYPos, width: sealW, height: sealH,
+                borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
+                color: rgb(1, 1, 1),
+            })
+
+            // Header: logo + "Verified Seal"
+            const headerY = sealYPos + sealH - 12
+            if (logoImage) {
+                const hLogoH = 9
+                const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+                sealPage.drawImage(logoImage, { x: sealX + 4, y: headerY - 1, width: hLogoW, height: hLogoH })
+                const vsX = sealX + 4 + hLogoW + 2
+                sealPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 4.5, font, color: sealLightGray })
+            } else {
+                sealPage.drawText('Trustera  Verified Seal', { x: sealX + 4, y: headerY + 1, size: 4.5, font: fontBold, color: sealGray })
+            }
+
+            // Signer info
+            const infoX = sealX + 4
+            const infoY = headerY - 9
+            const signerDisplayName = sigRequest.signer_name || 'Firmatario'
+            sealPage.drawText(signerDisplayName, { x: infoX, y: infoY, size: 5.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) })
+
+            // Date + time
+            const dd = String(signedAt.getDate()).padStart(2, '0')
+            const mo = String(signedAt.getMonth() + 1).padStart(2, '0')
+            const yy = signedAt.getFullYear()
+            const hh = String(signedAt.getHours()).padStart(2, '0')
+            const mi = String(signedAt.getMinutes()).padStart(2, '0')
+            sealPage.drawText(`${dd}/${mo}/${yy} — ${hh}:${mi} CET`, { x: infoX, y: infoY - 7, size: 4, font, color: sealGray })
+
+            // Certificate ID
+            sealPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 13, size: 3.5, font, color: sealLightGray })
+
+            // QR code (right side)
+            const qrSize = 13
+            sealPage.drawImage(qrImage, {
+                x: sealX + sealW - qrSize - 4,
+                y: infoY - 3,
+                width: qrSize, height: qrSize,
+            })
+
+            // Footer bar
+            const footerBarY = sealYPos
+            const footerBarH = 8
+            sealPage.drawText('Verifica ', { x: sealX + 4, y: footerBarY + 2, size: 3, font, color: sealLightGray })
+            sealPage.drawText('AuditTrail', { x: sealX + 4 + font.widthOfTextAtSize('Verifica ', 3), y: footerBarY + 2, size: 3, font: fontBold, color: darkGreen })
+
+            if (logoImage) {
+                const lH = 6
+                const lW = (logoImage.width / logoImage.height) * lH
+                sealPage.drawImage(logoImage, {
+                    x: sealX + sealW - lW - 4,
+                    y: footerBarY + (footerBarH - lH) / 2,
+                    width: lW, height: lH,
+                })
+            }
+
+            console.log(`[signature-complete] Trustera verified seal placed at x=${sealX}, y=${sealYPos}`)
+        }
+
         // Add signer full name on footer right of ALL pages
         {
             const allPages = pdfDoc.getPages()
@@ -210,108 +341,8 @@ export const handler: Handler = async (event) => {
             console.log(`[signature-complete] Footer name added on ${allPages.length} pages for: ${signerName}`)
         }
 
-        // Add attestation page
-        const page = pdfDoc.addPage([595.28, 841.89]) // A4
-        const { width, height } = page.getSize()
-
-        const black = rgb(0, 0, 0)
-        const gray = rgb(0.4, 0.4, 0.4)
-        const gold = rgb(0.83, 0.69, 0.22) // DR7 gold
-        const lightGray = rgb(0.95, 0.95, 0.95)
-
-        let y = height - 60
-
-        // Header
-        page.drawText('ATTESTAZIONE DI FIRMA ELETTRONICA', {
-            x: 50, y, size: 18, font: fontBold, color: black
-        })
-        y -= 8
-        page.drawLine({ start: { x: 50, y }, end: { x: width - 50, y }, thickness: 2, color: gold })
-        y -= 30
-
-        // Document info section
-        page.drawRectangle({ x: 45, y: y - 100, width: width - 90, height: 110, color: lightGray, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
-
-        page.drawText('INFORMAZIONI DOCUMENTO', { x: 55, y, size: 10, font: fontBold, color: gray })
-        y -= 20
-
-        const infoLines = [
-            ['Documento:', contract ? (contract.contract_number || 'N/A') : (sigRequest.document_name || 'Documento')],
-            ['Cliente:', sigRequest.signer_name],
-            ['Email:', sigRequest.signer_email],
-            ['Data firma:', signedAtRome],
-        ]
-
-        for (const [label, value] of infoLines) {
-            page.drawText(label, { x: 55, y, size: 10, font: fontBold, color: black })
-            page.drawText(value, { x: 170, y, size: 10, font, color: black })
-            y -= 18
-        }
-        y -= 25
-
-        // Signature verification section
-        page.drawRectangle({ x: 45, y: y - 120, width: width - 90, height: 130, color: lightGray, borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 1 })
-
-        page.drawText('VERIFICA FIRMA', { x: 55, y, size: 10, font: fontBold, color: gray })
-        y -= 20
-
-        const verifyLines = [
-            ['Metodo:', signatureImage
-                ? `Firma Elettronica Avanzata via OTP ${otpChannel === 'whatsapp' ? 'WhatsApp' : 'Email'} + Firma Autografa`
-                : `Firma Elettronica Avanzata via OTP ${otpChannel === 'whatsapp' ? 'WhatsApp' : 'Email'}`],
-            [otpChannel === 'whatsapp' ? 'WhatsApp OTP:' : 'Email OTP:', otpChannel === 'whatsapp' ? (sigRequest.signer_name || sigRequest.signer_email) : sigRequest.signer_email],
-            ['IP firmatario:', ipAddress],
-            ['User Agent:', (userAgent || '').substring(0, 70)],
-            ['Hash SHA-256:', currentHash.substring(0, 32) + '...'],
-        ]
-
-        for (const [label, value] of verifyLines) {
-            page.drawText(label, { x: 55, y, size: 9, font: fontBold, color: black })
-            page.drawText(value, { x: 170, y, size: 9, font, color: black })
-            y -= 18
-        }
-        y -= 30
-
-        // Legal text
-        page.drawText('DICHIARAZIONE', { x: 55, y, size: 10, font: fontBold, color: gray })
-        y -= 18
-
-        const legalLines = [
-            `Il sottoscritto ${sigRequest.signer_name} dichiara di aver preso visione del`,
-            `contratto sopra indicato e di approvarne integralmente il contenuto.`,
-            ``,
-            `La firma e stata apposta tramite verifica dell'identita via codice OTP`,
-            `inviato via ${otpChannel === 'whatsapp' ? 'WhatsApp' : `email a ${sigRequest.signer_email}`}, in conformita`,
-            `con il Regolamento eIDAS (UE) n. 910/2014 e il CAD (D.Lgs. 82/2005).`,
-            ``,
-            `Il presente documento e stato firmato elettronicamente e qualsiasi`,
-            `modifica successiva ne invalida l'autenticita. L'integrita del`,
-            `documento e garantita dall'hash SHA-256 sopra riportato.`,
-        ]
-
-        for (const line of legalLines) {
-            page.drawText(line, { x: 55, y, size: 10, font, color: black })
-            y -= 16
-        }
-        y -= 25
-
-        // Hash box
-        page.drawRectangle({ x: 45, y: y - 35, width: width - 90, height: 45, color: rgb(0.98, 0.96, 0.88), borderColor: gold, borderWidth: 1 })
-        page.drawText('HASH SHA-256 DOCUMENTO ORIGINALE', { x: 55, y, size: 8, font: fontBold, color: gray })
-        y -= 15
-        page.drawText(currentHash, { x: 55, y, size: 8, font, color: black })
-        y -= 40
-
-        // Footer
-        page.drawLine({ start: { x: 50, y }, end: { x: width - 50, y }, thickness: 1, color: rgb(0.85, 0.85, 0.85) })
-        y -= 15
-        page.drawText('Dubai rent 7.0 S.p.A. - Via del Fangario 25, 09122 Cagliari (CA) - P.IVA 04104640927', {
-            x: 55, y, size: 8, font, color: gray
-        })
-        y -= 12
-        page.drawText(`Documento generato automaticamente il ${signedAtRome} - Non modificabile`, {
-            x: 55, y, size: 8, font, color: gray
-        })
+        // No extra attestation page — the Trustera verified seal with QR code
+        // on the contract's last page IS the attestation (same as /sign/ flow)
 
         // Serialize final PDF
         const signedPdfBytes = await pdfDoc.save()

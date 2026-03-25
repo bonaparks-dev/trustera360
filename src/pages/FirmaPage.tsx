@@ -288,11 +288,11 @@ export default function FirmaPage() {
                     </div>
                 )}
 
-                {/* PDF Viewer — Google Docs Viewer for full multi-page support */}
+                {/* PDF Viewer — native browser PDF viewer */}
                 {contract?.pdfUrl && status !== 'signed' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
                         <iframe
-                            src={`https://docs.google.com/gview?url=${encodeURIComponent(contract.pdfUrl)}&embedded=true`}
+                            src={contract.pdfUrl}
                             className="w-full border-0"
                             style={{ height: '70vh', minHeight: '500px' }}
                             title="Documento PDF"

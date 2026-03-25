@@ -306,7 +306,7 @@ async function buildSignedPdf(
   // Three-column row y≈105-235, garante row y≈30-105
   function getSealPosition(signerIndex: number): { x: number; y: number } {
     if (signerIndex === 0) {
-      return { x: 280, y: 160 }   // Center of 1° guidatore
+      return { x: 260, y: 160 }   // 1° guidatore column
     } else if (signerIndex === 1) {
       return { x: 437, y: 160 }   // Center of 2° guidatore
     } else {

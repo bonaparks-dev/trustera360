@@ -127,6 +127,68 @@ export const handler: Handler = async (event) => {
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 
+        // Auto-fill FIRMA LOCATORE box on last page (DR7 contracts only)
+        if (contract) {
+            try {
+                const pages = pdfDoc.getPages()
+                const lastPage = pages[pages.length - 1]
+                const { width: pageWidth } = lastPage.getSize()
+
+                // FIRMA LOCATORE column is roughly x=30 to x=195 on A4 (595pt wide)
+                // Position text inside the box, below the "FIRMA LOCATORE" header
+                const locX = 40
+                let locY = 108 // Start below the "FIRMA LOCATORE" text
+
+                const locFontSize = 6.5
+                const locSmallSize = 5.5
+                const darkGray = rgb(0.15, 0.15, 0.15)
+                const medGray = rgb(0.35, 0.35, 0.35)
+
+                // Name (bold)
+                lastPage.drawText('Ilenia Campagnola', {
+                    x: locX, y: locY, size: 7.5, font: fontBold, color: darkGray
+                })
+                locY -= 11
+
+                // Company name
+                lastPage.drawText('Dubai Rent 7.0 S.p.A.', {
+                    x: locX, y: locY, size: locFontSize, font: fontBold, color: darkGray
+                })
+                locY -= 10
+
+                // Sede Legale
+                lastPage.drawText('Sede Legale: Via del Fangario 25', {
+                    x: locX, y: locY, size: locSmallSize, font, color: medGray
+                })
+                locY -= 8
+
+                lastPage.drawText('09122 Cagliari (CA)', {
+                    x: locX, y: locY, size: locSmallSize, font, color: medGray
+                })
+                locY -= 10
+
+                // Sede Operativa
+                lastPage.drawText('Sede Operativa: Viale Marconi 229', {
+                    x: locX, y: locY, size: locSmallSize, font, color: medGray
+                })
+                locY -= 8
+
+                lastPage.drawText('09131 Cagliari (CA)', {
+                    x: locX, y: locY, size: locSmallSize, font, color: medGray
+                })
+                locY -= 10
+
+                // P.IVA
+                lastPage.drawText('P.IVA 04104640927', {
+                    x: locX, y: locY, size: locSmallSize, font: fontBold, color: medGray
+                })
+
+                console.log('[signature-complete] FIRMA LOCATORE auto-filled on last page')
+            } catch (locErr: any) {
+                console.error('[signature-complete] Failed to fill FIRMA LOCATORE:', locErr.message)
+            }
+        }
+
         // Add signer full name on footer right of ALL pages
         {
             const allPages = pdfDoc.getPages()

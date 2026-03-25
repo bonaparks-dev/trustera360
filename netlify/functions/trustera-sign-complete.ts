@@ -175,7 +175,8 @@ async function buildSignedPdf(
   signers: AttestationSigner[],
   documentName: string,
   originalHash: string,
-  fieldEntries?: FieldValueEntry[]
+  fieldEntries?: FieldValueEntry[],
+  source?: string
 ): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.load(originalPdfBytes)
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
@@ -243,6 +244,34 @@ async function buildSignedPdf(
 
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
+
+  // Auto-fill FIRMA LOCATORE box for DR7 contracts
+  if (source && source.startsWith('dr7')) {
+    try {
+      const locX = 40
+      let locY = 108
+      const locFontSize = 6.5
+      const locSmallSize = 5.5
+      const dkGray = rgb(0.15, 0.15, 0.15)
+      const mdGray = rgb(0.35, 0.35, 0.35)
+
+      lastPage.drawText('Ilenia Campagnola', { x: locX, y: locY, size: 7.5, font: boldFont, color: dkGray })
+      locY -= 11
+      lastPage.drawText('Dubai Rent 7.0 S.p.A.', { x: locX, y: locY, size: locFontSize, font: boldFont, color: dkGray })
+      locY -= 10
+      lastPage.drawText('Sede Legale: Via del Fangario 25', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
+      locY -= 8
+      lastPage.drawText('09122 Cagliari (CA)', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
+      locY -= 10
+      lastPage.drawText('Sede Operativa: Viale Marconi 229', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
+      locY -= 8
+      lastPage.drawText('09131 Cagliari (CA)', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
+      locY -= 10
+      lastPage.drawText('P.IVA 04104640927', { x: locX, y: locY, size: locSmallSize, font: boldFont, color: mdGray })
+    } catch (e) {
+      console.warn('[buildSignedPdf] Failed to fill FIRMA LOCATORE:', e)
+    }
+  }
 
   // Generate certificate ID
   const year = new Date().getFullYear()
@@ -593,7 +622,7 @@ export const handler: Handler = async (event) => {
       }
 
       // Build signed PDF with field values + one attestation page per signer
-      const signedPdfBytes = await buildSignedPdf(pdfBytes, attestationSigners, doc.name, originalHash, fieldEntries)
+      const signedPdfBytes = await buildSignedPdf(pdfBytes, attestationSigners, doc.name, originalHash, fieldEntries, doc.source)
 
       // Upload signed PDF to storage
       const fileName = `signed/${doc.id}_signed_${Date.now()}.pdf`
@@ -823,7 +852,9 @@ export const handler: Handler = async (event) => {
         signing_user_agent: userAgent
       }],
       doc.name,
-      originalHash
+      originalHash,
+      undefined,
+      doc.source
     )
 
     // Upload signed PDF

@@ -138,7 +138,7 @@ export const handler: Handler = async (event) => {
                 // FIRMA LOCATORE column is roughly x=30 to x=195 on A4 (595pt wide)
                 // Position text inside the box, below the "FIRMA LOCATORE" header
                 const locX = 40
-                let locY = 200 // Inside FIRMA LOCATORE box, below the header
+                let locY = 190 // Below the "FIRMA LOCATORE" header (~y=220)
 
                 const locFontSize = 6.5
                 const locSmallSize = 5.5
@@ -248,13 +248,13 @@ export const handler: Handler = async (event) => {
             let sealYPos: number
             if (signerIndex === 0) {
                 sealX = 233   // Center of 1° guidatore column: (208+388)/2 - 65
-                sealYPos = 55  // Lower half of Row 1
+                sealYPos = 100 // Inside three-column row (y=85-235)
             } else if (signerIndex === 1) {
                 sealX = 412   // Center of 2° guidatore column: (388+567)/2 - 65
-                sealYPos = 55  // Lower half of Row 1
+                sealYPos = 100 // Inside three-column row (y=85-235)
             } else {
                 sealX = (pageWidth - sealW) / 2  // Centered for garante
-                sealYPos = 5   // Inside garante row (Row 2)
+                sealYPos = 35  // Inside garante row (y=25-85)
             }
 
             // Outer rectangle

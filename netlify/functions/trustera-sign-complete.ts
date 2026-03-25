@@ -249,7 +249,7 @@ async function buildSignedPdf(
   if (source && source.startsWith('dr7')) {
     try {
       const locX = 40
-      let locY = 200 // Inside FIRMA LOCATORE box, below the header
+      let locY = 190 // Below the "FIRMA LOCATORE" header (~y=220)
       const locFontSize = 6.5
       const locSmallSize = 5.5
       const dkGray = rgb(0.15, 0.15, 0.15)
@@ -299,11 +299,11 @@ async function buildSignedPdf(
   // Seal (130×42) centered in each box, placed in lower portion
   function getSealPosition(signerIndex: number): { x: number; y: number } {
     if (signerIndex === 0) {
-      return { x: 233, y: 55 }   // Center of 1° guidatore column
+      return { x: 233, y: 100 }   // Inside 1° guidatore box (three-column row y=85-235)
     } else if (signerIndex === 1) {
-      return { x: 412, y: 55 }   // Center of 2° guidatore column
+      return { x: 412, y: 100 }   // Inside 2° guidatore box
     } else {
-      return { x: (lastW - sealW) / 2, y: 5 }  // Garante row (centered)
+      return { x: (lastW - sealW) / 2, y: 35 }  // Inside garante row (y=25-85)
     }
   }
 

@@ -73,7 +73,7 @@ export const handler: Handler = async (event) => {
 
         // Fetch original document — either from contract or standalone document
         let contract: any = null
-        let pdfUrl: string | null = null
+        let originalPdfUrl: string | null = null
         let docIdentifier: string = sigRequest.id
 
         if (sigRequest.contract_id) {
@@ -83,24 +83,44 @@ export const handler: Handler = async (event) => {
                 .eq('id', sigRequest.contract_id)
                 .single()
             contract = contractData
-            pdfUrl = contract?.pdf_url
+            originalPdfUrl = contract?.pdf_url
             docIdentifier = contract?.contract_number || sigRequest.contract_id
         } else {
             // Standalone document
-            pdfUrl = sigRequest.document_url
+            originalPdfUrl = sigRequest.document_url
             docIdentifier = sigRequest.document_name || 'documento'
         }
 
-        if (!pdfUrl) {
+        if (!originalPdfUrl) {
             return { statusCode: 404, body: JSON.stringify({ error: 'Documento PDF non trovato' }) }
         }
 
-        // Download original PDF
-        const pdfResponse = await fetch(pdfUrl)
-        if (!pdfResponse.ok) {
+        // ── Accumulative signing: use latest signed PDF as base if other signers already signed ──
+        let basePdfUrl = originalPdfUrl
+        let isFirstSigner = true
+        if (sigRequest.contract_id) {
+            const { data: signedRequests } = await supabase
+                .from('signature_requests')
+                .select('id, signed_pdf_url, signed_at')
+                .eq('contract_id', sigRequest.contract_id)
+                .eq('status', 'signed')
+                .neq('id', sigRequest.id)
+                .order('signed_at', { ascending: false })
+                .limit(1)
+
+            if (signedRequests && signedRequests.length > 0 && signedRequests[0].signed_pdf_url) {
+                basePdfUrl = signedRequests[0].signed_pdf_url
+                isFirstSigner = false
+                console.log(`[signature-complete] Using accumulated PDF from previous signer as base`)
+            }
+        }
+
+        // Download the original PDF for hash verification
+        const origPdfResponse = await fetch(originalPdfUrl)
+        if (!origPdfResponse.ok) {
             return { statusCode: 500, body: JSON.stringify({ error: 'Impossibile scaricare il PDF' }) }
         }
-        const originalPdfBytes = new Uint8Array(await pdfResponse.arrayBuffer())
+        const originalPdfBytes = new Uint8Array(await origPdfResponse.arrayBuffer())
 
         // Verify PDF integrity (hash must match what was stored at init)
         const currentHash = crypto.createHash('sha256').update(Buffer.from(originalPdfBytes)).digest('hex')
@@ -119,14 +139,45 @@ export const handler: Handler = async (event) => {
             }
         }
 
-        // Load and modify PDF — add attestation page
-        const pdfDoc = await PDFDocument.load(originalPdfBytes)
+        // Download the base PDF (accumulated or original) for modification
+        let basePdfBytes: Uint8Array
+        if (basePdfUrl === originalPdfUrl) {
+            basePdfBytes = originalPdfBytes
+        } else {
+            const basePdfResponse = await fetch(basePdfUrl)
+            if (!basePdfResponse.ok) {
+                console.warn('[signature-complete] Could not download accumulated PDF, falling back to original')
+                basePdfBytes = originalPdfBytes
+                isFirstSigner = true
+            } else {
+                basePdfBytes = new Uint8Array(await basePdfResponse.arrayBuffer())
+            }
+        }
+
+        // Load and modify PDF — add seals
+        const pdfDoc = await PDFDocument.load(basePdfBytes)
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
         const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
 
 
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
+
+        // ── Determine signer position (needed for seal placement + footer offset) ──
+        let signerIndex = 0
+        if (sigRequest.contract_id) {
+            const { data: allRequests } = await supabase
+                .from('signature_requests')
+                .select('id, created_at')
+                .eq('contract_id', sigRequest.contract_id)
+                .in('status', ['signed', 'otp_verified', 'otp_sent', 'pending'])
+                .order('created_at', { ascending: true })
+            if (allRequests) {
+                signerIndex = allRequests.findIndex((r: any) => r.id === sigRequest.id)
+                if (signerIndex < 0) signerIndex = 0
+            }
+            console.log(`[signature-complete] Signer index: ${signerIndex} of ${allRequests?.length || 1}`)
+        }
 
         // ── Trustera Verified Seals with QR code on last page ──
         // FIRMA LOCATORE gets a seal too (Ilenia Campagnola), same format as guidatore
@@ -160,29 +211,13 @@ export const handler: Handler = async (event) => {
             const sealGray = rgb(0.35, 0.35, 0.35)
             const sealLightGray = rgb(0.75, 0.75, 0.75)
 
-            // Determine signer position for guidatore seal
-            let signerIndex = 0
-            if (sigRequest.contract_id) {
-                const { data: allRequests } = await supabase
-                    .from('signature_requests')
-                    .select('id, created_at')
-                    .eq('contract_id', sigRequest.contract_id)
-                    .in('status', ['signed', 'otp_verified', 'otp_sent', 'pending'])
-                    .order('created_at', { ascending: true })
-                if (allRequests) {
-                    signerIndex = allRequests.findIndex((r: any) => r.id === sigRequest.id)
-                    if (signerIndex < 0) signerIndex = 0
-                }
-                console.log(`[signature-complete] Signer index: ${signerIndex} of ${allRequests?.length || 1} for contract ${sigRequest.contract_id}`)
-            }
-
             // Contract last page layout (A4 = 595pt, y=0 at bottom):
             //   Row 1 (y≈105–235): FIRMA LOCATORE (x 30–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
             //   Row 2 (y≈30–105):  Firma del garante (full width x 30–567)
             // From screenshot: three-column row bottom border ≈ y=105, top ≈ y=235
 
-            // ── FIRMA LOCATORE seal (always drawn for DR7 contracts) ──
-            if (contract) {
+            // ── FIRMA LOCATORE seal (only drawn by the first signer to complete) ──
+            if (contract && isFirstSigner) {
                 const locSealX = 40  // Left side of LOCATORE column
                 const locSealY = 160 // Middle of LOCATORE box
 
@@ -302,25 +337,26 @@ export const handler: Handler = async (event) => {
             console.log(`[signature-complete] Trustera verified seal placed at x=${sealX}, y=${sealYPos}`)
         }
 
-        // Add signer full name on footer right of ALL pages
+        // Add signer full name on footer right of ALL pages (offset by signerIndex to avoid overlap)
         {
             const allPages = pdfDoc.getPages()
             const signerName = sigRequest.signer_name || 'N/A'
+            const nameSize = 8
+            const footerY = 15 + (signerIndex * 11) // Stack names vertically for multiple signers
 
             for (const pg of allPages) {
                 const { width: pageWidth } = pg.getSize()
-                const nameSize = 8
                 const nameWidth = font.widthOfTextAtSize(signerName, nameSize)
                 pg.drawText(signerName, {
                     x: pageWidth - nameWidth - 30,
-                    y: 15,
+                    y: footerY,
                     size: nameSize,
                     font,
                     color: rgb(0.3, 0.3, 0.3),
                 })
             }
 
-            console.log(`[signature-complete] Footer name added on ${allPages.length} pages for: ${signerName}`)
+            console.log(`[signature-complete] Footer name added on ${allPages.length} pages for: ${signerName} (index ${signerIndex})`)
         }
 
         // No extra attestation page — the Trustera verified seal with QR code
@@ -447,36 +483,58 @@ export const handler: Handler = async (event) => {
             }
         }
 
-        // Send signed document via WhatsApp using DR7's Green API (same conversation as signing link)
+        // ── Check if ALL signers for this contract have now signed ──
+        let allSignersDone = true
+        let totalSigners = 1
+        let allSignerRequests: any[] = []
+        if (sigRequest.contract_id) {
+            const { data: allReqs } = await supabase
+                .from('signature_requests')
+                .select('id, status, signer_name, signer_email, signer_phone, signed_pdf_url')
+                .eq('contract_id', sigRequest.contract_id)
+                .in('status', ['pending', 'otp_sent', 'otp_verified', 'signed'])
+            allSignerRequests = allReqs || []
+            totalSigners = allSignerRequests.length
+            allSignersDone = allSignerRequests.length > 0 && allSignerRequests.every((r: any) => r.status === 'signed')
+            console.log(`[signature-complete] ${allSignerRequests.filter((r: any) => r.status === 'signed').length}/${totalSigners} signers done. All done: ${allSignersDone}`)
+        }
+
+        // Send signed document via WhatsApp ONLY when ALL signers have completed
         const GREEN_API_INSTANCE_ID = process.env.DR7_GREEN_API_INSTANCE_ID || process.env.GREEN_API_INSTANCE_ID
         const GREEN_API_TOKEN = process.env.DR7_GREEN_API_TOKEN || process.env.GREEN_API_TOKEN
-        if (GREEN_API_INSTANCE_ID && GREEN_API_TOKEN && signedPdfUrl) {
-            try {
-                let customerPhone = sigRequest.signer_phone || ''
+        if (allSignersDone && GREEN_API_INSTANCE_ID && GREEN_API_TOKEN && signedPdfUrl) {
+            console.log(`[signature-complete] All ${totalSigners} signers done — sending fully-signed PDF via WhatsApp`)
 
-                if (!customerPhone && contract?.booking_id) {
+            // Send to ALL signers (not just the last one)
+            const phonesToSend: Set<string> = new Set()
+            for (const req of allSignerRequests) {
+                let phone = req.signer_phone || ''
+                if (!phone && contract?.booking_id) {
                     const { data: booking } = await supabase
                         .from('bookings')
                         .select('customer_phone, booking_details')
                         .eq('id', contract.booking_id)
                         .single()
-                    customerPhone = booking?.customer_phone || booking?.booking_details?.customer?.phone || ''
+                    phone = booking?.customer_phone || booking?.booking_details?.customer?.phone || ''
                 }
-
-                // For standalone documents, look up phone from customers_extended
-                if (!customerPhone && sigRequest.signer_email) {
+                if (!phone && req.signer_email) {
                     const { data: cust } = await supabase
                         .from('customers_extended')
                         .select('telefono')
-                        .eq('email', sigRequest.signer_email)
+                        .eq('email', req.signer_email)
                         .maybeSingle()
-                    customerPhone = cust?.telefono || ''
+                    phone = cust?.telefono || ''
                 }
-                if (customerPhone) {
-                    let cleanPhone = customerPhone.replace(/[\s\-\+\(\)]/g, '')
+                if (phone) {
+                    let cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '')
                     if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2)
                     if (cleanPhone.length === 10) cleanPhone = '39' + cleanPhone
+                    phonesToSend.add(cleanPhone)
+                }
+            }
 
+            for (const cleanPhone of Array.from(phonesToSend)) {
+                try {
                     const greenApiUrl = `https://api.green-api.com/waInstance${GREEN_API_INSTANCE_ID}/sendFileByUrl/${GREEN_API_TOKEN}`
                     const waResponse = await fetch(greenApiUrl, {
                         method: 'POST',
@@ -485,24 +543,21 @@ export const handler: Handler = async (event) => {
                             chatId: `${cleanPhone}@c.us`,
                             urlFile: signedPdfUrl,
                             fileName: `${docIdentifier}_firmato.pdf`,
-                            caption: `${contract ? 'Contratto' : 'Documento'} ${docIdentifier} firmato - DR7 Empire`
+                            caption: `${contract ? 'Contratto' : 'Documento'} ${docIdentifier} firmato da tutti i firmatari - DR7 Empire`
                         })
                     })
-
                     const waResult = await waResponse.json()
                     if (waResponse.ok && !waResult.error) {
-                        console.log('[signature-complete] Signed contract sent via WhatsApp:', waResult.idMessage)
+                        console.log(`[signature-complete] Fully-signed PDF sent to ${cleanPhone}:`, waResult.idMessage)
                     } else {
-                        console.error('[signature-complete] WhatsApp send failed:', waResult)
+                        console.error(`[signature-complete] WhatsApp send failed for ${cleanPhone}:`, waResult)
                     }
-                } else {
-                    console.log('[signature-complete] No customer phone — skipping WhatsApp send')
+                } catch (waErr: any) {
+                    console.error(`[signature-complete] WhatsApp send failed for ${cleanPhone}:`, waErr.message)
                 }
-            } catch (waErr: any) {
-                console.error('[signature-complete] WhatsApp send failed:', waErr.message)
             }
 
-            // Also send a copy to owner via Trustera's Green API (arrives in Trustera chat)
+            // Also send a copy to owner via Trustera's Green API
             const TRUSTERA_INSTANCE = process.env.GREEN_API_INSTANCE_ID
             const TRUSTERA_TOKEN = process.env.GREEN_API_TOKEN
             const ownerPhone = process.env.TRUSTERA_OWNER_WHATSAPP || '393457905205'
@@ -516,7 +571,7 @@ export const handler: Handler = async (event) => {
                             chatId: `${ownerPhone}@c.us`,
                             urlFile: signedPdfUrl,
                             fileName: `${docIdentifier}_firmato.pdf`,
-                            caption: `✅ Contratto ${docIdentifier} firmato da ${sigRequest.signer_name || 'cliente'}`
+                            caption: `✅ Contratto ${docIdentifier} — firmato da tutti (${totalSigners} firmatari)`
                         })
                     })
                     const ownerResult = await ownerRes.json()
@@ -529,6 +584,9 @@ export const handler: Handler = async (event) => {
                     console.warn('[signature-complete] Trustera owner copy error:', ownerErr.message)
                 }
             }
+        } else if (!allSignersDone) {
+            const signedCount = allSignerRequests.filter((r: any) => r.status === 'signed').length
+            console.log(`[signature-complete] ${signedCount}/${totalSigners} signed — waiting for remaining signers before sending PDF`)
         }
 
         // Dual-write to Trustera Supabase — copy signed document + marketing consent
@@ -585,8 +643,8 @@ export const handler: Handler = async (event) => {
             console.warn('[signature-complete] Trustera sync failed (non-blocking):', syncErr.message)
         }
 
-        // Auto-send to CARGOS via admin panel (only for rental contracts with booking_id)
-        if (contract?.booking_id) {
+        // Auto-send to CARGOS via admin panel (only after ALL signers done)
+        if (allSignersDone && contract?.booking_id) {
             try {
                 const cargosRes = await fetch('https://admin.dr7empire.com/.netlify/functions/cargos-auto-trigger', {
                     method: 'POST',

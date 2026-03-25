@@ -128,69 +128,8 @@ export const handler: Handler = async (event) => {
         const signedAt = new Date()
         const signedAtRome = signedAt.toLocaleString('it-IT', { timeZone: 'Europe/Rome' })
 
-        // Auto-fill FIRMA LOCATORE box on last page (DR7 contracts only)
-        if (contract) {
-            try {
-                const pages = pdfDoc.getPages()
-                const lastPage = pages[pages.length - 1]
-                const { width: pageWidth } = lastPage.getSize()
-
-                // FIRMA LOCATORE column is roughly x=30 to x=195 on A4 (595pt wide)
-                // Position text inside the box, below the "FIRMA LOCATORE" header
-                const locX = 40
-                let locY = 190 // Below the "FIRMA LOCATORE" header (~y=220)
-
-                const locFontSize = 6.5
-                const locSmallSize = 5.5
-                const darkGray = rgb(0.15, 0.15, 0.15)
-                const medGray = rgb(0.35, 0.35, 0.35)
-
-                // Name (bold)
-                lastPage.drawText('Ilenia Campagnola', {
-                    x: locX, y: locY, size: 7.5, font: fontBold, color: darkGray
-                })
-                locY -= 11
-
-                // Company name
-                lastPage.drawText('Dubai Rent 7.0 S.p.A.', {
-                    x: locX, y: locY, size: locFontSize, font: fontBold, color: darkGray
-                })
-                locY -= 10
-
-                // Sede Legale
-                lastPage.drawText('Sede Legale: Via del Fangario 25', {
-                    x: locX, y: locY, size: locSmallSize, font, color: medGray
-                })
-                locY -= 8
-
-                lastPage.drawText('09122 Cagliari (CA)', {
-                    x: locX, y: locY, size: locSmallSize, font, color: medGray
-                })
-                locY -= 10
-
-                // Sede Operativa
-                lastPage.drawText('Sede Operativa: Viale Marconi 229', {
-                    x: locX, y: locY, size: locSmallSize, font, color: medGray
-                })
-                locY -= 8
-
-                lastPage.drawText('09131 Cagliari (CA)', {
-                    x: locX, y: locY, size: locSmallSize, font, color: medGray
-                })
-                locY -= 10
-
-                // P.IVA
-                lastPage.drawText('P.IVA 04104640927', {
-                    x: locX, y: locY, size: locSmallSize, font: fontBold, color: medGray
-                })
-
-                console.log('[signature-complete] FIRMA LOCATORE auto-filled on last page')
-            } catch (locErr: any) {
-                console.error('[signature-complete] Failed to fill FIRMA LOCATORE:', locErr.message)
-            }
-        }
-
-        // ── Trustera Verified Seal with QR code on last page ──
+        // ── Trustera Verified Seals with QR code on last page ──
+        // FIRMA LOCATORE gets a seal too (Ilenia Campagnola), same format as guidatore
         {
             const verifyUrl = `https://trustera360.app/verify/${currentHash}`
             const qrPng = await QRCode.toBuffer(verifyUrl, { type: 'png', width: 300, margin: 1 })
@@ -221,10 +160,7 @@ export const handler: Handler = async (event) => {
             const sealGray = rgb(0.35, 0.35, 0.35)
             const sealLightGray = rgb(0.75, 0.75, 0.75)
 
-            // Determine signer position: count previous signed requests for same contract
-            // A4 = 595pt. Contract last page layout:
-            //   Row 1: FIRMA LOCATORE (~0-195) | 1° guidatore (~195-395) | 2° guidatore (~395-595)
-            //   Row 2: Garante (full width, lower on page)
+            // Determine signer position for guidatore seal
             let signerIndex = 0
             if (sigRequest.contract_id) {
                 const { data: allRequests } = await supabase
@@ -241,20 +177,66 @@ export const handler: Handler = async (event) => {
             }
 
             // Contract last page layout (A4 = 595pt, y=0 at bottom):
-            //   Row 1 (y≈40–140): FIRMA LOCATORE (x 28–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
-            //   Row 2 (y≈0–40):   Firma del garante (full width x 28–567)
-            // Seal (130×42) centered in each box, placed in lower portion
+            //   Row 1 (y≈105–235): FIRMA LOCATORE (x 30–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
+            //   Row 2 (y≈30–105):  Firma del garante (full width x 30–567)
+            // From screenshot: three-column row bottom border ≈ y=105, top ≈ y=235
+
+            // ── FIRMA LOCATORE seal (always drawn for DR7 contracts) ──
+            if (contract) {
+                const locSealX = 40  // Left side of LOCATORE column
+                const locSealY = 130 // Inside LOCATORE box
+
+                // Draw seal for Ilenia Campagnola
+                sealPage.drawRectangle({
+                    x: locSealX, y: locSealY, width: sealW, height: sealH,
+                    borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
+                    color: rgb(1, 1, 1),
+                })
+                const locHeaderY = locSealY + sealH - 12
+                if (logoImage) {
+                    const hLogoH = 9
+                    const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+                    sealPage.drawImage(logoImage, { x: locSealX + 4, y: locHeaderY - 1, width: hLogoW, height: hLogoH })
+                    sealPage.drawText('Verified Seal', { x: locSealX + 4 + hLogoW + 2, y: locHeaderY + 1, size: 4.5, font, color: sealLightGray })
+                } else {
+                    sealPage.drawText('Trustera  Verified Seal', { x: locSealX + 4, y: locHeaderY + 1, size: 4.5, font: fontBold, color: sealGray })
+                }
+                const locInfoX = locSealX + 4
+                const locInfoY = locHeaderY - 9
+                sealPage.drawText('Ilenia Campagnola', { x: locInfoX, y: locInfoY, size: 5.5, font: fontBold, color: rgb(0.1, 0.1, 0.1) })
+                const dd = String(signedAt.getDate()).padStart(2, '0')
+                const mo = String(signedAt.getMonth() + 1).padStart(2, '0')
+                const yy = signedAt.getFullYear()
+                const hh = String(signedAt.getHours()).padStart(2, '0')
+                const mi = String(signedAt.getMinutes()).padStart(2, '0')
+                sealPage.drawText(`${dd}/${mo}/${yy} — ${hh}:${mi} CET`, { x: locInfoX, y: locInfoY - 7, size: 4, font, color: sealGray })
+                sealPage.drawText(`ID: ${certId}`, { x: locInfoX, y: locInfoY - 13, size: 3.5, font, color: sealLightGray })
+                const locQrSize = 13
+                sealPage.drawImage(qrImage, { x: locSealX + sealW - locQrSize - 4, y: locInfoY - 3, width: locQrSize, height: locQrSize })
+                const locFooterY = locSealY
+                sealPage.drawText('Verifica ', { x: locSealX + 4, y: locFooterY + 2, size: 3, font, color: sealLightGray })
+                sealPage.drawText('AuditTrail', { x: locSealX + 4 + font.widthOfTextAtSize('Verifica ', 3), y: locFooterY + 2, size: 3, font: fontBold, color: darkGreen })
+                if (logoImage) {
+                    const lH = 6
+                    const lW = (logoImage.width / logoImage.height) * lH
+                    sealPage.drawImage(logoImage, { x: locSealX + sealW - lW - 4, y: locFooterY + 1, width: lW, height: lH })
+                }
+                console.log('[signature-complete] FIRMA LOCATORE seal placed')
+            }
+
+            // ── Guidatore / Garante seal positions ──
+            // From screenshot: LOCATORE col wider (~30-248), 1° guid (~248-438), 2° guid (~438-567)
             let sealX: number
             let sealYPos: number
             if (signerIndex === 0) {
-                sealX = 233   // Center of 1° guidatore column: (208+388)/2 - 65
-                sealYPos = 100 // Inside three-column row (y=85-235)
+                sealX = 280   // Center of 1° guidatore: (248+438)/2 - 65
+                sealYPos = 130 // Inside three-column row
             } else if (signerIndex === 1) {
-                sealX = 412   // Center of 2° guidatore column: (388+567)/2 - 65
-                sealYPos = 100 // Inside three-column row (y=85-235)
+                sealX = 437   // Center of 2° guidatore: (438+567)/2 - 65
+                sealYPos = 130 // Inside three-column row
             } else {
                 sealX = (pageWidth - sealW) / 2  // Centered for garante
-                sealYPos = 35  // Inside garante row (y=25-85)
+                sealYPos = 45  // Inside garante row
             }
 
             // Outer rectangle

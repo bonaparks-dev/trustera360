@@ -245,34 +245,6 @@ async function buildSignedPdf(
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
 
-  // Auto-fill FIRMA LOCATORE box for DR7 contracts
-  if (source && source.startsWith('dr7')) {
-    try {
-      const locX = 40
-      let locY = 190 // Below the "FIRMA LOCATORE" header (~y=220)
-      const locFontSize = 6.5
-      const locSmallSize = 5.5
-      const dkGray = rgb(0.15, 0.15, 0.15)
-      const mdGray = rgb(0.35, 0.35, 0.35)
-
-      lastPage.drawText('Ilenia Campagnola', { x: locX, y: locY, size: 7.5, font: boldFont, color: dkGray })
-      locY -= 11
-      lastPage.drawText('Dubai Rent 7.0 S.p.A.', { x: locX, y: locY, size: locFontSize, font: boldFont, color: dkGray })
-      locY -= 10
-      lastPage.drawText('Sede Legale: Via del Fangario 25', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
-      locY -= 8
-      lastPage.drawText('09122 Cagliari (CA)', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
-      locY -= 10
-      lastPage.drawText('Sede Operativa: Viale Marconi 229', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
-      locY -= 8
-      lastPage.drawText('09131 Cagliari (CA)', { x: locX, y: locY, size: locSmallSize, font, color: mdGray })
-      locY -= 10
-      lastPage.drawText('P.IVA 04104640927', { x: locX, y: locY, size: locSmallSize, font: boldFont, color: mdGray })
-    } catch (e) {
-      console.warn('[buildSignedPdf] Failed to fill FIRMA LOCATORE:', e)
-    }
-  }
-
   // Generate certificate ID
   const year = new Date().getFullYear()
   const certId = `TR-${year}-${originalHash.slice(0, 8).toUpperCase()}`
@@ -280,30 +252,65 @@ async function buildSignedPdf(
   // Seal dimensions — compact to fit inside contract signature boxes
   const sealW = 130
   const sealH = 42
-  const sealYPos = 12
 
   const green = rgb(0.09, 0.55, 0.27)
   const darkGreen = rgb(0.06, 0.35, 0.18)
   const gray = rgb(0.35, 0.35, 0.35)
   const lightGray = rgb(0.75, 0.75, 0.75)
 
-  // Draw one seal per signer, positioned for DR7 contract layout:
-  // A4 = 595pt wide. Contract has 3 columns:
-  //   FIRMA LOCATORE (~0-195), 1° guidatore (~195-395), 2° guidatore (~395-595)
-  // 1 signer → center of "1° guidatore" column
-  // 2 signers → 1st in "1° guidatore", 2nd in "2° guidatore"
-  // 3+ signers → spread evenly across page
-  // Contract last page layout (A4 = 595pt, y=0 at bottom):
-  //   Row 1 (y≈40–140): FIRMA LOCATORE (x 28–208) | 1° guidatore (x 208–388) | 2° guidatore (x 388–567)
-  //   Row 2 (y≈0–40):   Firma del garante (full width x 28–567)
-  // Seal (130×42) centered in each box, placed in lower portion
+  // FIRMA LOCATORE seal for DR7 contracts (same format as guidatore)
+  if (source && source.startsWith('dr7')) {
+    try {
+      const locSealX = 40
+      const locSealY = 130
+
+      lastPage.drawRectangle({
+        x: locSealX, y: locSealY, width: sealW, height: sealH,
+        borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75, color: rgb(1, 1, 1),
+      })
+      const locHeaderY = locSealY + sealH - 12
+      if (logoImage) {
+        const hLogoH = 9
+        const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+        lastPage.drawImage(logoImage, { x: locSealX + 4, y: locHeaderY - 1, width: hLogoW, height: hLogoH })
+        lastPage.drawText('Verified Seal', { x: locSealX + 4 + hLogoW + 2, y: locHeaderY + 1, size: 4.5, font, color: lightGray })
+      } else {
+        lastPage.drawText('Trustera  Verified Seal', { x: locSealX + 4, y: locHeaderY + 1, size: 4.5, font: boldFont, color: gray })
+      }
+      const locInfoX = locSealX + 4
+      const locInfoY = locHeaderY - 9
+      lastPage.drawText('Ilenia Campagnola', { x: locInfoX, y: locInfoY, size: 5.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+      const now = new Date()
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mo = String(now.getMonth() + 1).padStart(2, '0')
+      const yy = now.getFullYear()
+      const hh = String(now.getHours()).padStart(2, '0')
+      const mi = String(now.getMinutes()).padStart(2, '0')
+      lastPage.drawText(`${dd}/${mo}/${yy} — ${hh}:${mi} CET`, { x: locInfoX, y: locInfoY - 7, size: 4, font, color: gray })
+      lastPage.drawText(`ID: ${certId}`, { x: locInfoX, y: locInfoY - 13, size: 3.5, font, color: lightGray })
+      lastPage.drawImage(qrImage, { x: locSealX + sealW - 13 - 4, y: locInfoY - 3, width: 13, height: 13 })
+      lastPage.drawText('Verifica ', { x: locSealX + 4, y: locSealY + 2, size: 3, font, color: lightGray })
+      lastPage.drawText('AuditTrail', { x: locSealX + 4 + font.widthOfTextAtSize('Verifica ', 3), y: locSealY + 2, size: 3, font: boldFont, color: darkGreen })
+      if (logoImage) {
+        const lH = 6
+        const lW = (logoImage.width / logoImage.height) * lH
+        lastPage.drawImage(logoImage, { x: locSealX + sealW - lW - 4, y: locSealY + 1, width: lW, height: lH })
+      }
+    } catch (e) {
+      console.warn('[buildSignedPdf] Failed to draw FIRMA LOCATORE seal:', e)
+    }
+  }
+
+  // Guidatore / Garante seal positions
+  // From screenshot: LOCATORE (~30-248), 1° guid (~248-438), 2° guid (~438-567)
+  // Three-column row y≈105-235, garante row y≈30-105
   function getSealPosition(signerIndex: number): { x: number; y: number } {
     if (signerIndex === 0) {
-      return { x: 233, y: 100 }   // Inside 1° guidatore box (three-column row y=85-235)
+      return { x: 280, y: 130 }   // Center of 1° guidatore
     } else if (signerIndex === 1) {
-      return { x: 412, y: 100 }   // Inside 2° guidatore box
+      return { x: 437, y: 130 }   // Center of 2° guidatore
     } else {
-      return { x: (lastW - sealW) / 2, y: 35 }  // Inside garante row (y=25-85)
+      return { x: (lastW - sealW) / 2, y: 45 }  // Inside garante row
     }
   }
 

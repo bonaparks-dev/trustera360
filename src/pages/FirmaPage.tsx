@@ -288,11 +288,22 @@ export default function FirmaPage() {
                     </div>
                 )}
 
-                {/* PDF Viewer — native browser PDF viewer */}
+                {/* PDF Viewer */}
                 {contract?.pdfUrl && status !== 'signed' && (
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+                        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
+                            <span className="text-sm text-gray-600 font-medium">Documento</span>
+                            <a
+                                href={contract.pdfUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-sm text-yellow-700 hover:text-yellow-800 font-semibold underline"
+                            >
+                                Apri PDF
+                            </a>
+                        </div>
                         <iframe
-                            src={contract.pdfUrl}
+                            src={`https://docs.google.com/gview?url=${encodeURIComponent(contract.pdfUrl)}&embedded=true`}
                             className="w-full border-0"
                             style={{ height: '70vh', minHeight: '500px' }}
                             title="Documento PDF"

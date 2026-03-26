@@ -45,10 +45,14 @@ function formatAction(action: string): string {
     signing_completed: 'Firma Completata',
     email_sent: 'Link Inviato',
     whatsapp_sent: 'Link Inviato',
+    link_sent: 'Link di Firma Inviato',
     signed_pdf_sent: 'PDF Firmato Inviato',
     approval_requested: 'Approvazione Richiesta',
     approval_approved: 'Approvato',
     approval_rejected: 'Rifiutato',
+    request_created: 'Richiesta di Firma Creata',
+    request_cancelled: 'Richiesta Annullata',
+    integrity_check_failed: 'Verifica Integrità Fallita',
   }
   return map[action] || action.replace(/_/g, ' ')
 }
@@ -71,6 +75,11 @@ function formatDescription(evt: AuditEvent): string {
     case 'approval_requested': return `Richiesta di approvazione inviata a ${name || evt.email}`
     case 'approval_approved': return `Documento approvato da ${name || evt.email}`
     case 'approval_rejected': return `Documento rifiutato da ${name || evt.email}${evt.metadata?.reason ? ` — ${evt.metadata.reason}` : ''}`
+    case 'request_created': return `Richiesta di firma creata per ${name || evt.metadata?.signer_role || 'firmatario'}`
+    case 'request_cancelled': return 'Richiesta precedente annullata'
+    case 'link_sent': return `Link di firma inviato via WhatsApp${name ? ` a ${name}` : ''}`
+    case 'document_signed': return `Documento firmato da ${name || evt.email}`
+    case 'integrity_check_failed': return 'Verifica integrità del documento fallita'
     default: return formatAction(evt.action)
   }
 }

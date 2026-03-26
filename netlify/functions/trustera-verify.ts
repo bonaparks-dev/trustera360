@@ -6,6 +6,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// DR7 Supabase — for fetching audit trail + signature requests for DR7 contracts
+const supabaseDR7 = createClient(
+  process.env.DR7_SUPABASE_URL || 'https://ahpmzjgkfxrrgxyirasa.supabase.co',
+  process.env.DR7_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) }
@@ -139,7 +145,7 @@ export const handler: Handler = async (event) => {
     console.log('[trustera-verify] Not found in trustera_documents, trying signed_documents_log')
     const { data: logEntries, error: logError } = await supabase
       .from('signed_documents_log')
-      .select('document_name, signer_name, signer_email, signed_at, signer_ip, original_pdf_hash, metadata')
+      .select('document_name, signer_name, signer_email, signed_at, signer_ip, original_pdf_hash, metadata, source')
       .eq('original_pdf_hash', hash)
       .limit(1)
 
@@ -156,28 +162,89 @@ export const handler: Handler = async (event) => {
     console.log('[trustera-verify] Found in signed_documents_log:', logEntry.document_name)
 
     const signerList: any[] = []
-    if (logEntry.metadata?.signers) {
-      for (const s of logEntry.metadata.signers) {
+    let auditTrail: any[] = []
+    let createdAt: string | null = null
+    const contractId = logEntry.metadata?.contract_id || null
+    const source = (logEntry as any).source || ''
+
+    // For DR7 contracts, fetch rich signer data + audit trail from DR7 DB
+    if (source.startsWith('dr7') && contractId) {
+      // Fetch all signature_requests for this contract
+      const { data: dr7Signers } = await supabaseDR7
+        .from('signature_requests')
+        .select('id, signer_name, signer_email, signer_phone, status, signed_at, signer_ip, signer_user_agent, created_at')
+        .eq('contract_id', contractId)
+        .in('status', ['signed'])
+        .order('created_at', { ascending: true })
+
+      if (dr7Signers && dr7Signers.length > 0) {
+        for (const s of dr7Signers) {
+          signerList.push({
+            name: s.signer_name,
+            email: s.signer_email || '',
+            phone: s.signer_phone || '',
+            channel: 'whatsapp',
+            signed_at: s.signed_at,
+            signing_ip: s.signer_ip || 'N/A',
+            user_agent: s.signer_user_agent || '',
+            marketing_consent: false
+          })
+        }
+
+        // Fetch audit trail from DR7 for all signature_requests of this contract
+        const sigRequestIds = dr7Signers.map((s: any) => s.id)
+        const { data: dr7Audit } = await supabaseDR7
+          .from('signature_audit_trail')
+          .select('event_type, event_description, ip_address, user_agent, created_at, metadata')
+          .in('signature_request_id', sigRequestIds)
+          .order('created_at', { ascending: true })
+
+        if (dr7Audit && dr7Audit.length > 0) {
+          auditTrail = dr7Audit.map((e: any) => ({
+            action: e.event_type,
+            email: e.metadata?.signer_email || '',
+            ip: e.ip_address || '',
+            userAgent: e.user_agent || '',
+            timestamp: e.created_at,
+            metadata: e.metadata || {}
+          }))
+        }
+      }
+
+      // Get contract creation date
+      const { data: contractData } = await supabaseDR7
+        .from('contracts')
+        .select('created_at')
+        .eq('id', contractId)
+        .single()
+      createdAt = contractData?.created_at || null
+    }
+
+    // Fallback: use signed_documents_log data if DR7 query returned nothing
+    if (signerList.length === 0) {
+      if (logEntry.metadata?.signers) {
+        for (const s of logEntry.metadata.signers) {
+          signerList.push({
+            name: s.name,
+            email: s.email || '',
+            phone: '',
+            channel: 'email',
+            signed_at: s.signed_at,
+            signing_ip: s.ip || 'N/A',
+            user_agent: s.user_agent || ''
+          })
+        }
+      } else {
         signerList.push({
-          name: s.name,
-          email: s.email || '',
+          name: logEntry.signer_name,
+          email: logEntry.signer_email || '',
           phone: '',
           channel: 'email',
-          signed_at: s.signed_at,
-          signing_ip: s.ip || 'N/A',
-          user_agent: s.user_agent || ''
+          signed_at: logEntry.signed_at,
+          signing_ip: logEntry.signer_ip || 'N/A',
+          user_agent: ''
         })
       }
-    } else {
-      signerList.push({
-        name: logEntry.signer_name,
-        email: logEntry.signer_email || '',
-        phone: '',
-        channel: 'email',
-        signed_at: logEntry.signed_at,
-        signing_ip: logEntry.signer_ip || 'N/A',
-        user_agent: ''
-      })
     }
 
     return {
@@ -185,11 +252,11 @@ export const handler: Handler = async (event) => {
       body: JSON.stringify({
         documentName: logEntry.document_name,
         signedAt: logEntry.signed_at,
-        createdAt: null,
+        createdAt,
         originalHash: logEntry.original_pdf_hash,
-        senderName: '',
+        senderName: 'DR7 Empire S.p.A.',
         signers: signerList,
-        auditTrail: []
+        auditTrail
       })
     }
   } catch (error: any) {

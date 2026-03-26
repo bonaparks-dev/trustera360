@@ -140,28 +140,28 @@ export default function VerifyPage() {
   )
 
   const InfoRow = ({ label, value, mono }: { label: string; value: string; mono?: boolean }) => (
-    <div className="py-1">
+    <div className="py-1 min-w-0">
       <p className="text-[10px] text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className={`text-sm text-gray-800 ${mono ? 'font-mono text-xs' : ''}`}>{value || '—'}</p>
+      <p className={`text-sm text-gray-800 break-words ${mono ? 'font-mono text-xs break-all' : ''}`}>{value || '—'}</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="bg-white shadow-lg max-w-3xl mx-auto">
+    <div className="min-h-screen bg-gray-50 px-2 sm:px-4 py-4 sm:py-8">
+      <div className="bg-white shadow-lg max-w-3xl mx-auto overflow-hidden">
         {/* Header */}
-        <div className="px-8 pt-8 pb-4">
+        <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4">
           <div className="flex items-center gap-4 mb-2">
-            <img src="/trustera-logo.png" alt="Trustera" className="h-12" />
+            <img src="/trustera-logo.png" alt="Trustera" className="h-10 sm:h-12" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Audit Trail - Firma Elettronica</h1>
-          <p className="text-sm text-gray-500 mt-1">{data.documentName}{data.signers[0] ? ` - ${data.signers[0].name}` : ''}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Audit Trail - Firma Elettronica</h1>
+          <p className="text-sm text-gray-500 mt-1 break-words">{data.documentName}{data.signers[0] ? ` - ${data.signers[0].name}` : ''}</p>
         </div>
 
-        <div className="px-8 pb-8">
+        <div className="px-4 sm:px-8 pb-6 sm:pb-8">
           {/* ── INFORMAZIONI DOCUMENTO ── */}
           <SectionTitle>Informazioni Documento</SectionTitle>
-          <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
+          <div className="bg-gray-50 rounded-lg px-4 sm:px-5 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
             <InfoRow label="Documento" value={data.documentName} />
             <InfoRow label="Inviato da" value={data.senderName || '—'} />
             {data.senderEmail && <InfoRow label="Email mittente" value={data.senderEmail} />}
@@ -173,52 +173,68 @@ export default function VerifyPage() {
           {data.signers.map((s, i) => (
             <div key={i}>
               <SectionTitle>Informazioni Firmatario {data.signers.length > 1 ? `(${i + 1}/${data.signers.length})` : ''}</SectionTitle>
-              <div className="bg-gray-50 rounded-lg px-5 py-3 grid grid-cols-2 gap-x-8 gap-y-2">
+              <div className="bg-gray-50 rounded-lg px-4 sm:px-5 py-3 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
                 <InfoRow label="Nome e Cognome" value={s.name} />
                 <InfoRow label="Email" value={s.email} />
                 {s.phone && <InfoRow label="Telefono" value={s.phone} />}
                 <InfoRow label="Data firma" value={fmtDateShort(s.signed_at)} />
                 <InfoRow label="Canale" value={s.channel === 'whatsapp' ? 'WhatsApp' : 'Email'} />
                 <InfoRow label="IP" value={s.signing_ip} mono />
-                {s.user_agent && <div className="col-span-2"><InfoRow label="User Agent" value={s.user_agent} /></div>}
+                {s.user_agent && <div className="sm:col-span-2"><InfoRow label="User Agent" value={s.user_agent} /></div>}
               </div>
-
             </div>
           ))}
 
           {/* ── VERIFICA INTEGRITA ── */}
           <SectionTitle>Verifica Integrita</SectionTitle>
           <div className="space-y-2">
-            <div className="border border-gray-200 rounded-lg px-4 py-3">
+            <div className="border border-gray-200 rounded-lg px-3 sm:px-4 py-3">
               <p className="text-xs font-semibold text-gray-700 mb-1">Hash SHA-256 Documento Originale:</p>
-              <p className="text-xs text-gray-600 font-mono break-all">{data.originalHash}</p>
+              <p className="text-[10px] sm:text-xs text-gray-600 font-mono break-all">{data.originalHash}</p>
             </div>
           </div>
 
           {/* ── REGISTRO EVENTI ── */}
           <SectionTitle>Registro Eventi</SectionTitle>
           {data.auditTrail.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border border-gray-200">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Data/Ora</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Evento</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Descrizione</th>
-                    <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[130px]">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.auditTrail.map((evt, i) => (
-                    <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="px-3 py-2.5 text-xs text-gray-600 align-top whitespace-nowrap">{fmtDateShort(evt.timestamp)}</td>
-                      <td className="px-3 py-2.5 text-xs font-semibold text-gray-800 align-top">{formatAction(evt.action)}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-600 align-top">{formatDescription(evt)}</td>
-                      <td className="px-3 py-2.5 text-xs text-gray-500 font-mono align-top">{evt.ip || ''}</td>
+            <div className="space-y-0">
+              {/* Desktop table — hidden on mobile */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm border border-gray-200">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Data/Ora</th>
+                      <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[140px]">Evento</th>
+                      <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase">Descrizione</th>
+                      <th className="text-left px-3 py-2 text-[10px] font-semibold text-gray-500 uppercase w-[130px]">IP</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {data.auditTrail.map((evt, i) => (
+                      <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="px-3 py-2.5 text-xs text-gray-600 align-top whitespace-nowrap">{fmtDateShort(evt.timestamp)}</td>
+                        <td className="px-3 py-2.5 text-xs font-semibold text-gray-800 align-top">{formatAction(evt.action)}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-600 align-top">{formatDescription(evt)}</td>
+                        <td className="px-3 py-2.5 text-xs text-gray-500 font-mono align-top">{evt.ip || ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile cards — visible only on mobile */}
+              <div className="sm:hidden space-y-2">
+                {data.auditTrail.map((evt, i) => (
+                  <div key={i} className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="text-xs font-semibold text-gray-800">{formatAction(evt.action)}</span>
+                      <span className="text-[10px] text-gray-400 whitespace-nowrap flex-shrink-0">{fmtDateShort(evt.timestamp)}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 break-words">{formatDescription(evt)}</p>
+                    {evt.ip && <p className="text-[10px] text-gray-400 font-mono mt-1">IP: {evt.ip}</p>}
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-gray-400 italic py-3">Nessun evento registrato. Gli eventi verranno tracciati per i nuovi documenti.</p>

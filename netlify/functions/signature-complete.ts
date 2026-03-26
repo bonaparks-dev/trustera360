@@ -219,7 +219,7 @@ export const handler: Handler = async (event) => {
             // ── FIRMA LOCATORE seal (only drawn by the first signer to complete) ──
             if (contract && isFirstSigner) {
                 const locSealX = 40  // Left side of LOCATORE column
-                const locSealY = 160 // Middle of LOCATORE box
+                const locSealY = 135 // Inside LOCATORE box, below header text
 
                 // Draw seal for Ilenia Campagnola
                 sealPage.drawRectangle({
@@ -265,10 +265,10 @@ export const handler: Handler = async (event) => {
             let sealYPos: number
             if (signerIndex === 0) {
                 sealX = 260   // 1° guidatore column
-                sealYPos = 160 // Middle of three-column row
+                sealYPos = 135 // Inside box, below header text
             } else if (signerIndex === 1) {
                 sealX = 437   // Center of 2° guidatore: (438+567)/2 - 65
-                sealYPos = 160 // Middle of three-column row
+                sealYPos = 135 // Inside box, below header text
             } else {
                 sealX = (pageWidth - sealW) / 2  // Centered for garante
                 sealYPos = 45  // Inside garante row

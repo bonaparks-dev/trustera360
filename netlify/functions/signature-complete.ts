@@ -264,7 +264,7 @@ export const handler: Handler = async (event) => {
             let sealX: number
             let sealYPos: number
             if (signerIndex === 0) {
-                sealX = 260   // 1° guidatore column
+                sealX = 250   // 1° guidatore column
                 sealYPos = 135 // Inside box, below header text
             } else if (signerIndex === 1) {
                 sealX = 437   // Center of 2° guidatore: (438+567)/2 - 65

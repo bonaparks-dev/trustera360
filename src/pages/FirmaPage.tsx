@@ -272,7 +272,7 @@ export default function FirmaPage() {
                                 <div>
                                     <span className="text-gray-500 block">Ritiro</span>
                                     <span className="font-semibold">
-                                        {new Date(contract.rentalStartDate).toLocaleDateString('it-IT')}
+                                        {new Date(contract.rentalStartDate).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
                                     </span>
                                 </div>
                             )}
@@ -280,7 +280,7 @@ export default function FirmaPage() {
                                 <div>
                                     <span className="text-gray-500 block">Riconsegna</span>
                                     <span className="font-semibold">
-                                        {new Date(contract.rentalEndDate).toLocaleDateString('it-IT')}
+                                        {new Date(contract.rentalEndDate).toLocaleDateString('it-IT', { timeZone: 'Europe/Rome' })}
                                     </span>
                                 </div>
                             )}
@@ -293,14 +293,6 @@ export default function FirmaPage() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
                         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
                             <span className="text-sm text-gray-600 font-medium">Documento</span>
-                            <a
-                                href={contract.pdfUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-sm text-yellow-700 hover:text-yellow-800 font-semibold underline"
-                            >
-                                Apri PDF
-                            </a>
                         </div>
                         <iframe
                             src={`https://docs.google.com/gview?url=${encodeURIComponent(contract.pdfUrl)}&embedded=true`}

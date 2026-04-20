@@ -30,7 +30,7 @@ export default function SignPage() {
   const [signedAt, setSignedAt] = useState<string | null>(null)
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [error, setError] = useState('')
-  const [marketingConsent, setMarketingConsent] = useState<boolean | null>(null)
+  const [marketingConsent, setMarketingConsent] = useState<boolean | null>(true)
   const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)
   const [requireOtp, setRequireOtp] = useState(true)
   const otpRefs = useRef<(HTMLInputElement | null)[]>([])

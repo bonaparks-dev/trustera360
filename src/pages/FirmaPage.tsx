@@ -24,7 +24,7 @@ export default function FirmaPage() {
     const [error, setError] = useState('')
     const [remainingAttempts, setRemainingAttempts] = useState(5)
     const [acceptedTerms, setAcceptedTerms] = useState(false)
-    const [acceptedMarketing, setAcceptedMarketing] = useState<boolean | null>(null)
+    const [acceptedMarketing, setAcceptedMarketing] = useState<boolean | null>(true)
     const [existingMarketingConsent, setExistingMarketingConsent] = useState<boolean | null>(null)
     const [showMarketingInfo, setShowMarketingInfo] = useState(false)
     const [otpChannel, setOtpChannel] = useState<'whatsapp' | 'email' | null>(null)

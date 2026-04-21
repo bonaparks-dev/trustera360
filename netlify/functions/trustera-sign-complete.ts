@@ -168,6 +168,7 @@ interface FieldValueEntry {
   height_percent: number
   label?: string
   value: string | boolean
+  signer_index?: number
 }
 
 async function buildSignedPdf(
@@ -244,12 +245,13 @@ async function buildSignedPdf(
 
   const lastPage = pdfDoc.getPage(pdfDoc.getPageCount() - 1)
   const { width: lastW } = lastPage.getSize()
+  const allPages = pdfDoc.getPages()
 
   // Generate certificate ID
   const year = new Date().getFullYear()
   const certId = `TR-${year}-${originalHash.slice(0, 8).toUpperCase()}`
 
-  // Seal dimensions — compact to fit inside contract signature boxes
+  // Default seal dimensions — compact to fit inside contract signature boxes
   const sealW = 130
   const sealH = 42
 
@@ -257,6 +259,58 @@ async function buildSignedPdf(
   const darkGreen = rgb(0.06, 0.35, 0.18)
   const gray = rgb(0.35, 0.35, 0.35)
   const lightGray = rgb(0.75, 0.75, 0.75)
+
+  // ── Helper: draw a complete Verified Seal at (x, y) on a given page ─────
+  function drawSeal(
+    page: any,
+    signerName: string,
+    signedAtIso: string | undefined,
+    sx: number,
+    sy: number,
+    sw: number,
+    sh: number,
+  ) {
+    const scale = sw / 130
+    page.drawRectangle({
+      x: sx, y: sy, width: sw, height: sh,
+      borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
+      color: rgb(1, 1, 1),
+    })
+
+    const headerY = sy + sh - 12 * scale
+    if (logoImage) {
+      const hLogoH = 9 * scale
+      const hLogoW = (logoImage.width / logoImage.height) * hLogoH
+      page.drawImage(logoImage, { x: sx + 4 * scale, y: headerY - 1 * scale, width: hLogoW, height: hLogoH })
+      page.drawText('Verified Seal', { x: sx + 4 * scale + hLogoW + 2 * scale, y: headerY + 1 * scale, size: 4.5 * scale, font, color: lightGray })
+    } else {
+      page.drawText('Trustera  Verified Seal', { x: sx + 4 * scale, y: headerY + 1 * scale, size: 4.5 * scale, font: boldFont, color: gray })
+    }
+
+    const infoX = sx + 4 * scale
+    const infoY = headerY - 9 * scale
+    page.drawText(signerName || 'Firmatario', { x: infoX, y: infoY, size: 5.5 * scale, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
+
+    const signDate = new Date(signedAtIso || new Date().toISOString())
+    const dd = String(signDate.getDate()).padStart(2, '0')
+    const mo = String(signDate.getMonth() + 1).padStart(2, '0')
+    const yy = signDate.getFullYear()
+    const hh = String(signDate.getHours()).padStart(2, '0')
+    const mi = String(signDate.getMinutes()).padStart(2, '0')
+    page.drawText(`${dd}/${mo}/${yy} — ${hh}:${mi} CET`, { x: infoX, y: infoY - 7 * scale, size: 4 * scale, font, color: gray })
+    page.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 13 * scale, size: 3.5 * scale, font, color: lightGray })
+
+    const qrSize = 13 * scale
+    page.drawImage(qrImage, { x: sx + sw - qrSize - 4 * scale, y: infoY - 3 * scale, width: qrSize, height: qrSize })
+
+    page.drawText('Verifica ', { x: sx + 4 * scale, y: sy + 2 * scale, size: 3 * scale, font, color: lightGray })
+    page.drawText('AuditTrail', { x: sx + 4 * scale + font.widthOfTextAtSize('Verifica ', 3 * scale), y: sy + 2 * scale, size: 3 * scale, font: boldFont, color: darkGreen })
+    if (logoImage) {
+      const lH = 6 * scale
+      const lW = (logoImage.width / logoImage.height) * lH
+      page.drawImage(logoImage, { x: sx + sw - lW - 4 * scale, y: sy + 1 * scale, width: lW, height: lH })
+    }
+  }
 
   // FIRMA LOCATORE seal for DR7 contracts (same format as guidatore)
   if (source && source.startsWith('dr7')) {
@@ -301,89 +355,47 @@ async function buildSignedPdf(
     }
   }
 
-  // Guidatore / Garante seal positions
+  // ── Draw seals at user-placed signature positions ───────────────────────
+  const placedForSigner = new Set<number>()
+  if (fieldEntries && fieldEntries.length > 0) {
+    for (const entry of fieldEntries) {
+      if (entry.field_type !== 'signature') continue
+      const signerIdx = entry.signer_index ?? 0
+      const signer = signers[signerIdx]
+      if (!signer) continue
+      const pageIndex = entry.page_number - 1
+      if (pageIndex < 0 || pageIndex >= allPages.length) continue
+      const page = allPages[pageIndex]
+      const { width: pw, height: ph } = page.getSize()
+
+      const sw = Math.max(90, (entry.width_percent / 100) * pw)
+      const sh = Math.max(28, (entry.height_percent / 100) * ph)
+      const sx = (entry.x_percent / 100) * pw
+      const sy = ph - (entry.y_percent / 100) * ph - sh
+
+      drawSeal(page, signer.name, signer.signed_at, sx, sy, sw, sh)
+      placedForSigner.add(signerIdx)
+    }
+  }
+
+  // ── Fallback hardcoded positions on last page (for signers without placed fields) ──
+  // Preserves DR7 contract layout where signature boxes are pre-printed.
   // From screenshot: LOCATORE (~30-248), 1° guid (~248-438), 2° guid (~438-567)
-  // Three-column row y≈105-235, garante row y≈30-105
   function getSealPosition(signerIndex: number): { x: number; y: number } {
     if (signerIndex === 0) {
-      return { x: 230, y: 135 }   // 1° guidatore column
+      return { x: 230, y: 135 }
     } else if (signerIndex === 1) {
-      return { x: 437, y: 135 }   // 2° guidatore column
+      return { x: 437, y: 135 }
     } else {
-      return { x: (lastW - sealW) / 2, y: 35 }  // Inside garante row
+      return { x: (lastW - sealW) / 2, y: 35 }
     }
   }
 
   for (let si = 0; si < signers.length; si++) {
+    if (placedForSigner.has(si)) continue
     const signer = signers[si]
     const { x: sealX, y: sealY } = getSealPosition(si)
-
-    // Outer rectangle (white background, light gray border)
-    lastPage.drawRectangle({
-      x: sealX, y: sealY, width: sealW, height: sealH,
-      borderColor: rgb(0.85, 0.85, 0.85), borderWidth: 0.75,
-      color: rgb(1, 1, 1),
-    })
-
-    // ── Header: Trustera logo + "Verified Seal" ──
-    const headerY = sealY + sealH - 12
-    if (logoImage) {
-      const hLogoH = 9
-      const hLogoW = (logoImage.width / logoImage.height) * hLogoH
-      lastPage.drawImage(logoImage, { x: sealX + 4, y: headerY - 1, width: hLogoW, height: hLogoH })
-      const vsX = sealX + 4 + hLogoW + 2
-      lastPage.drawText('Verified Seal', { x: vsX, y: headerY + 1, size: 4.5, font, color: lightGray })
-    } else {
-      lastPage.drawText('Trustera  Verified Seal', { x: sealX + 4, y: headerY + 1, size: 4.5, font: boldFont, color: gray })
-    }
-
-    // ── Left side: signer info ──
-    const infoX = sealX + 4
-    const infoY = headerY - 9
-
-    // Signer name (bold)
-    const signerName = signer.name || 'Firmatario'
-    lastPage.drawText(signerName, { x: infoX, y: infoY, size: 5.5, font: boldFont, color: rgb(0.1, 0.1, 0.1) })
-
-    // Date + time
-    const signDate = new Date(signer.signed_at || new Date().toISOString())
-    const dd = String(signDate.getDate()).padStart(2, '0')
-    const mo = String(signDate.getMonth() + 1).padStart(2, '0')
-    const yy = signDate.getFullYear()
-    const hh = String(signDate.getHours()).padStart(2, '0')
-    const mi = String(signDate.getMinutes()).padStart(2, '0')
-    const dateTimeStr = `${dd}/${mo}/${yy} — ${hh}:${mi} CET`
-    lastPage.drawText(dateTimeStr, { x: infoX, y: infoY - 7, size: 4, font, color: gray })
-
-    // Certificate ID
-    lastPage.drawText(`ID: ${certId}`, { x: infoX, y: infoY - 13, size: 3.5, font, color: lightGray })
-
-    // ── Right side: QR code ──
-    const qrSize = 13
-    lastPage.drawImage(qrImage, {
-      x: sealX + sealW - qrSize - 4,
-      y: infoY - 3,
-      width: qrSize, height: qrSize,
-    })
-
-    // ── Footer ──
-    const footerBarY = sealY
-    const footerBarH = 8
-
-    // Footer text left
-    lastPage.drawText('Verifica ', { x: sealX + 4, y: footerBarY + 2, size: 3, font, color: lightGray })
-    lastPage.drawText('AuditTrail', { x: sealX + 4 + font.widthOfTextAtSize('Verifica ', 3), y: footerBarY + 2, size: 3, font: boldFont, color: darkGreen })
-
-    // Footer Trustera logo right
-    if (logoImage) {
-      const lH = 6
-      const lW = (logoImage.width / logoImage.height) * lH
-      lastPage.drawImage(logoImage, {
-        x: sealX + sealW - lW - 4,
-        y: footerBarY + (footerBarH - lH) / 2,
-        width: lW, height: lH,
-      })
-    }
+    drawSeal(lastPage, signer.name, signer.signed_at, sealX, sealY, sealW, sealH)
   }
 
   return pdfDoc.save()
@@ -613,7 +625,7 @@ export const handler: Handler = async (event) => {
           .eq('document_id', doc.id)
 
         fieldEntries = (updatedFields || [])
-          .filter((f: any) => f.value !== null && f.value !== undefined)
+          .filter((f: any) => f.field_type === 'signature' || (f.value !== null && f.value !== undefined))
           .map((f: any) => ({
             field_type: f.field_type,
             page_number: f.page_number,
@@ -623,6 +635,7 @@ export const handler: Handler = async (event) => {
             height_percent: f.height_percent,
             label: f.label,
             value: f.field_type === 'checkbox' ? f.value === 'true' : f.value,
+            signer_index: f.signer_index,
           }))
       }
 

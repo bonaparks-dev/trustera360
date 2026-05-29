@@ -186,9 +186,12 @@ export const handler: Handler = async (event) => {
             console.log(`[signature-complete] Signer index: ${signerIndex} of ${allRequests?.length || 1}`)
 
             // ── Role detection via booking_details ────────────────────
-            // Carichiamo il booking attraverso il contract per matchare il
-            // signer corrente con uno dei "ruoli" possibili. Se il match e'
-            // ambiguo o non trovato, fallback al comportamento by-index.
+            // 2026-05-29: ORDER IS CRITICAL. Controlliamo PRIMA i fideiussori
+            // (match by NAME, che e' unico) e SOLO DOPO il customer / 2° guidatore.
+            // Motivo: i fideiussori senza email in OperatoriTab ricevono in
+            // fallback l'email del CUSTOMER quando salvati in signature_requests.
+            // Quindi confrontare per email metterebbe TUTTI i fideiussori senza
+            // email nel ruolo di customer. Il match by name evita la collisione.
             try {
                 const { data: ctx } = await supabase
                     .from('contracts')
@@ -203,51 +206,62 @@ export const handler: Handler = async (event) => {
                         .maybeSingle()
                     const normPhone = (s: any) => String(s || '').replace(/[\s\+\-\(\)]/g, '').replace(/^00/, '').toLowerCase()
                     const normEmail = (s: any) => String(s || '').trim().toLowerCase()
+                    const normName = (s: any) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ')
                     const sigEmail = normEmail(sigRequest.signer_email)
                     const sigPhone = normPhone(sigRequest.signer_phone)
-                    // 1° guidatore = booking customer
-                    const custEmail = normEmail(bk?.customer_email || bk?.booking_details?.customer?.email)
-                    const custPhone = normPhone(bk?.customer_phone || bk?.booking_details?.customer?.phone)
-                    if ((sigEmail && sigEmail === custEmail) || (sigPhone && sigPhone === custPhone)) {
-                        signerRole = '1_guidatore'
+                    const sigName = normName(sigRequest.signer_name)
+
+                    // Step 1: fideiussori PRIMA (by name OR phone; mai by email
+                    // perche' potrebbero condividere l'email fallback del customer)
+                    const fids: any[] = Array.isArray(bk?.booking_details?.guarantors)
+                        ? bk.booking_details.guarantors
+                        : []
+                    let matchedFid: 1 | 2 | 3 | null = null
+                    for (const row of fids) {
+                        const n = Number(row?.index)
+                        if (n !== 1 && n !== 2 && n !== 3) continue
+                        const fName = normName(row[`garante_${n}_nome_cognome`])
+                        const fPhone = normPhone(row[`garante_${n}_telefono`])
+                        // Name match e' la chiave primaria (unica per riga)
+                        if (sigName && fName && sigName === fName) {
+                            matchedFid = n as 1 | 2 | 3
+                            break
+                        }
+                        // Phone fallback se il name e' vuoto/typo
+                        if (sigPhone && fPhone && sigPhone === fPhone) {
+                            matchedFid = n as 1 | 2 | 3
+                            break
+                        }
+                    }
+                    if (matchedFid) {
+                        signerRole = `fideiussore_${matchedFid}` as typeof signerRole
                     } else {
-                        // 2° guidatore
+                        // Step 2: 2° guidatore (by phone preferibilmente, by name come fallback)
                         const sd = bk?.booking_details?.second_driver
+                        const sdName = normName((sd?.name || '') + ' ' + (sd?.surname || ''))
                         const sdEmail = normEmail(sd?.email)
                         const sdPhone = normPhone(sd?.phone)
-                        if ((sigEmail && sigEmail === sdEmail) || (sigPhone && sigPhone === sdPhone)) {
+                        if ((sigPhone && sdPhone && sigPhone === sdPhone)
+                            || (sigName && sdName && sigName === sdName)
+                            || (sigEmail && sdEmail && sigEmail === sdEmail)) {
                             signerRole = '2_guidatore'
                         } else {
-                            // garante veicolo (cauzione_auto)
+                            // Step 3: garante veicolo (cauzione_auto legacy)
                             const gv = bk?.booking_details?.garante_veicolo
+                            const gvName = normName((gv?.nome || '') + ' ' + (gv?.cognome || ''))
                             const gvEmail = normEmail(gv?.email)
                             const gvPhone = normPhone(gv?.telefono || gv?.phone)
-                            if ((sigEmail && sigEmail === gvEmail) || (sigPhone && sigPhone === gvPhone)) {
+                            if ((sigPhone && gvPhone && sigPhone === gvPhone)
+                                || (sigName && gvName && sigName === gvName)
+                                || (sigEmail && gvEmail && sigEmail === gvEmail)) {
                                 signerRole = 'garante'
                             } else {
-                                // Fideiussori solidali (1/2/3)
-                                const fids: any[] = Array.isArray(bk?.booking_details?.guarantors)
-                                    ? bk.booking_details.guarantors
-                                    : []
-                                let matchedN: 1 | 2 | 3 | null = null
-                                for (const row of fids) {
-                                    const n = Number(row?.index)
-                                    if (n !== 1 && n !== 2 && n !== 3) continue
-                                    const fEmail = normEmail(row[`garante_${n}_email`])
-                                    const fPhone = normPhone(row[`garante_${n}_telefono`])
-                                    if ((sigEmail && sigEmail === fEmail) || (sigPhone && sigPhone === fPhone)) {
-                                        matchedN = n as 1 | 2 | 3
-                                        break
-                                    }
-                                }
-                                if (matchedN) {
-                                    signerRole = `fideiussore_${matchedN}` as typeof signerRole
-                                }
-                                // else: stays as '1_guidatore' fallback
+                                // Step 4: default -> customer (1° guidatore)
+                                signerRole = '1_guidatore'
                             }
                         }
                     }
-                    console.log(`[signature-complete] Role detected: ${signerRole} for ${sigRequest.signer_name}`)
+                    console.log(`[signature-complete] Role detected: ${signerRole} for "${sigRequest.signer_name}" (email=${sigEmail}, phone=${sigPhone})`)
                 }
             } catch (roleErr: any) {
                 console.warn('[signature-complete] Role detection failed (fallback to index-based):', roleErr?.message)

@@ -245,27 +245,27 @@ export default function FirmaPage() {
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
-            <div className="bg-white py-4 px-6 flex items-center justify-between shadow-sm border-b border-gray-200">
-                <img src="/trustera-icon.jpeg" alt="Trustera" className="h-10" />
-                <span className="text-sm text-gray-500">Firma Elettronica</span>
+            <div className="bg-white py-3 px-4 sm:py-4 sm:px-6 flex items-center justify-between gap-3 shadow-sm border-b border-gray-200">
+                <img src="/trustera-icon.jpeg" alt="Trustera" className="h-8 sm:h-10" />
+                <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Firma Elettronica</span>
             </div>
 
-            <div className="max-w-2xl mx-auto p-4 sm:p-6">
+            <div className="max-w-2xl mx-auto p-3 sm:p-6">
                 {/* Contract Info Card */}
                 {contract && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-                        <h1 className="text-xl font-bold text-gray-800 mb-1">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+                        <h1 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 break-words">
                             {contract.vehicleName ? `Contratto ${contract.contractNumber}` : contract.contractNumber || 'Documento'}
                         </h1>
-                        <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-4 text-sm">
                             <div>
                                 <span className="text-gray-500 block">Cliente</span>
-                                <span className="font-semibold">{signerName}</span>
+                                <span className="font-semibold break-words">{signerName}</span>
                             </div>
                             {contract.vehicleName && (
                                 <div>
                                     <span className="text-gray-500 block">Veicolo</span>
-                                    <span className="font-semibold">{contract.vehicleName}</span>
+                                    <span className="font-semibold break-words">{contract.vehicleName}</span>
                                 </div>
                             )}
                             {contract.rentalStartDate && (
@@ -290,14 +290,13 @@ export default function FirmaPage() {
 
                 {/* PDF Viewer */}
                 {contract?.pdfUrl && status !== 'signed' && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4 sm:mb-6">
                         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200">
                             <span className="text-sm text-gray-600 font-medium">Documento</span>
                         </div>
                         <iframe
                             src={`https://docs.google.com/gview?url=${encodeURIComponent(contract.pdfUrl)}&embedded=true`}
-                            className="w-full border-0"
-                            style={{ height: '70vh', minHeight: '500px' }}
+                            className="w-full border-0 h-[60vh] sm:h-[70vh] min-h-[320px] sm:min-h-[500px]"
                             title="Documento PDF"
                         />
                     </div>
@@ -343,7 +342,7 @@ export default function FirmaPage() {
                                 : `Abbiamo inviato un codice a 6 cifre a ${signerEmail}`}
                         </p>
 
-                        <div className="flex justify-center gap-2 mb-6" onPaste={handleOtpPaste}>
+                        <div className="flex justify-center gap-1.5 sm:gap-2 mb-6" onPaste={handleOtpPaste}>
                             {otp.map((digit, i) => (
                                 <input
                                     key={i}
@@ -354,7 +353,7 @@ export default function FirmaPage() {
                                     value={digit}
                                     onChange={e => handleOtpChange(i, e.target.value)}
                                     onKeyDown={e => handleOtpKeyDown(i, e)}
-                                    className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none transition-colors"
+                                    className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-yellow-500 focus:outline-none transition-colors"
                                     disabled={status === 'otp_verifying'}
                                 />
                             ))}
@@ -466,14 +465,14 @@ export default function FirmaPage() {
 
                 {/* Step 4: Signed */}
                 {status === 'signed' && (
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sm:p-6 text-center">
                         <div className="text-5xl mb-4">&#9989;</div>
-                        <h2 className="text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
-                        <p className="text-gray-600 mb-2">
+                        <h2 className="text-xl sm:text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
+                        <p className="text-sm sm:text-base text-gray-600 mb-2 leading-relaxed">
                             Il documento e stato firmato con successo
                             {signedAt && !isNaN(new Date(signedAt).getTime()) ? ` il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}` : ''}.
                         </p>
-                        <p className="text-gray-500 text-sm mb-6">
+                        <p className="text-gray-500 text-sm mb-2 leading-relaxed">
                             Riceverai una copia del documento firmato via WhatsApp.
                         </p>
                     </div>
@@ -481,15 +480,19 @@ export default function FirmaPage() {
             </div>
 
             {/* Footer */}
-            <div className="text-center py-6 text-xs text-gray-400">
-                Dubai rent 7.0 S.p.A. - Via del Fangario 25, 09122 Cagliari (CA) - P.IVA 04104640927
+            <div className="text-center py-6 px-4 text-xs text-gray-400 leading-relaxed">
+                <span className="block sm:inline">Dubai rent 7.0 S.p.A.</span>
+                <span className="hidden sm:inline"> &middot; </span>
+                <span className="block sm:inline">Via del Fangario 25, 09122 Cagliari (CA)</span>
+                <span className="hidden sm:inline"> &middot; </span>
+                <span className="block sm:inline">P.IVA 04104640927</span>
             </div>
 
             {/* Marketing Info Modal */}
             {showMarketingInfo && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowMarketingInfo(false)}>
-                    <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-gray-800 mb-4">
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setShowMarketingInfo(false)}>
+                    <div className="bg-white rounded-t-2xl sm:rounded-xl max-w-lg w-full max-h-[90vh] sm:max-h-[80vh] overflow-y-auto p-4 sm:p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">
                             INFORMATIVA SUL TRATTAMENTO DEI DATI PERSONALI PER FINALITA DI MARKETING
                         </h3>
                         <div className="text-sm text-gray-700 space-y-3">

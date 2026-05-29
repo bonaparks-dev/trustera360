@@ -59,7 +59,7 @@ function TerminiContent() {
           <ArticleBadge number={1} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Oggetto del Servizio</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera è una piattaforma digitale dedicata alla gestione documentale, alla raccolta di firme
             elettroniche, all'automazione dei flussi di approvazione e, ove previsto, all'integrazione di tali
@@ -88,7 +88,7 @@ function TerminiContent() {
           <ArticleBadge number={2} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Registrazione e Account</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Per utilizzare i servizi Trustera, l'utente deve creare un account fornendo dati completi, corretti,
             aggiornati e veritieri.
@@ -117,7 +117,7 @@ function TerminiContent() {
           <ArticleBadge number={3} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Periodo di Prova Gratuito</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera può mettere a disposizione dell'utente un periodo di prova gratuito della durata di 30
             giorni, finalizzato a consentire la valutazione delle funzionalità della piattaforma.
@@ -145,7 +145,7 @@ function TerminiContent() {
           <ArticleBadge number={4} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Piani, Durata e Modalità di Fatturazione</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <SubHeading>4.1 Piani Standard</SubHeading>
           <p>
             I piani standard sono disponibili con fatturazione mensile o annuale. Il rinnovo avviene
@@ -174,7 +174,7 @@ function TerminiContent() {
           <ArticleBadge number={5} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Pagamenti</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             L'utente si impegna a corrispondere i corrispettivi dovuti per il piano sottoscritto secondo
             le modalità e le scadenze indicate al momento dell'acquisto.
@@ -201,7 +201,7 @@ function TerminiContent() {
           <ArticleBadge number={6} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Recesso, Disdetta e Cancellazione</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <SubHeading>6.1 Piani Mensili</SubHeading>
           <p>
             L'utente può disdire il piano mensile in qualsiasi momento dall'area di gestione dell'account.
@@ -233,7 +233,7 @@ function TerminiContent() {
           <ArticleBadge number={7} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Uso Consentito della Piattaforma</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             L'utente si impegna a utilizzare la piattaforma Trustera nel pieno rispetto della normativa
             vigente, in conformità ai presenti Termini e secondo i principi di buona fede e correttezza.
@@ -271,7 +271,7 @@ function TerminiContent() {
           <ArticleBadge number={8} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Disponibilità del Servizio e Manutenzione</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera si impegna a rendere la piattaforma ragionevolmente disponibile e funzionante, adottando
             misure tecniche adeguate per garantire continuità e affidabilità del servizio.
@@ -298,7 +298,7 @@ function TerminiContent() {
           <ArticleBadge number={9} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Proprietà Intellettuale</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Tutti i diritti di proprietà intellettuale relativi alla piattaforma Trustera, inclusi ma non
             limitati a software, codice sorgente, interfacce grafiche, loghi, marchi, denominazioni,
@@ -323,7 +323,7 @@ function TerminiContent() {
           <ArticleBadge number={10} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Trattamento dei Dati Personali</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Il trattamento dei dati personali degli utenti avviene nel rispetto del Regolamento (UE)
             2016/679 ("GDPR") e della normativa nazionale applicabile.
@@ -355,7 +355,7 @@ function TerminiContent() {
           <ArticleBadge number={11} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Limitazione di Responsabilità</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Nei limiti consentiti dalla normativa applicabile, Trustera non sarà responsabile per danni
             indiretti, consequenziali, incidentali, punitivi o per perdita di profitti, dati, reputazione
@@ -379,7 +379,7 @@ function TerminiContent() {
           <ArticleBadge number={12} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Modifiche ai Termini o al Servizio</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera si riserva il diritto di aggiornare, modificare o integrare i presenti Termini di
             Servizio in qualsiasi momento, anche al fine di adeguarsi a variazioni normative, tecnologiche
@@ -404,7 +404,7 @@ function TerminiContent() {
           <ArticleBadge number={13} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Legge Applicabile e Foro Competente</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             I presenti Termini di Servizio sono disciplinati dalla legge italiana. Per qualsiasi
             controversia relativa all'interpretazione, all'esecuzione o alla risoluzione dei presenti
@@ -436,7 +436,7 @@ function ApiContent() {
           <ArticleBadge number={1} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Oggetto</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Le presenti Condizioni disciplinano l'accesso e l'utilizzo delle API (Application Programming
             Interface) di Trustera, messe a disposizione degli utenti che hanno sottoscritto un piano API
@@ -462,7 +462,7 @@ function ApiContent() {
           <ArticleBadge number={2} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Accesso — API Key e Token</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             L'accesso alle API Trustera avviene tramite credenziali di autenticazione (API Key o token
             di accesso) generate dalla piattaforma. Tali credenziali sono strettamente personali e
@@ -494,7 +494,7 @@ function ApiContent() {
           <ArticleBadge number={3} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Ambiente Sandbox</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera può mettere a disposizione degli sviluppatori un ambiente sandbox isolato, dedicato
             ai test di integrazione e allo sviluppo applicativo, senza impatto sull'ambiente di produzione
@@ -523,7 +523,7 @@ function ApiContent() {
           <ArticleBadge number={4} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Piani API e Durata</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             I piani API sono sottoscritti su base annuale e comprendono volumi predefiniti di utilizzo
             (chiamate API, documenti elaborati, firme richieste, webhook ricevuti o altri parametri
@@ -552,7 +552,7 @@ function ApiContent() {
           <ArticleBadge number={5} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Limiti Tecnici e Rate Limiting</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Per garantire la stabilità e l'equità del servizio a tutti gli utenti, Trustera applica
             limiti tecnici al numero di richieste API effettuabili in un determinato intervallo di
@@ -585,7 +585,7 @@ function ApiContent() {
           <ArticleBadge number={6} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Uso Consentito</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             L'utilizzo delle API Trustera è consentito esclusivamente per le finalità previste dal
             piano sottoscritto e nel rispetto della normativa vigente.
@@ -620,7 +620,7 @@ function ApiContent() {
           <ArticleBadge number={7} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Integrazione e Responsabilità</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             L'utente che integra le API Trustera all'interno di proprie applicazioni o piattaforme è
             responsabile della corretta implementazione dell'integrazione, del comportamento della
@@ -650,7 +650,7 @@ function ApiContent() {
           <ArticleBadge number={8} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Webhook</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera può mettere a disposizione meccanismi di notifica asincrona tramite webhook,
             consentendo all'utente di ricevere aggiornamenti in tempo reale sugli eventi rilevanti
@@ -683,7 +683,7 @@ function ApiContent() {
           <ArticleBadge number={9} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Disponibilità e SLA</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera si impegna a garantire la disponibilità delle API secondo livelli di servizio
             (SLA) eventualmente definiti nel piano API sottoscritto o nella documentazione commerciale.
@@ -712,7 +712,7 @@ function ApiContent() {
           <ArticleBadge number={10} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Sicurezza</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera adotta misure di sicurezza tecniche e organizzative adeguate a proteggere le
             API e i dati trattati attraverso esse. L'utente è parimenti tenuto ad adottare pratiche
@@ -744,7 +744,7 @@ function ApiContent() {
           <ArticleBadge number={11} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Sospensione e Revoca dell'Accesso</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera si riserva il diritto di sospendere o revocare l'accesso alle API in qualsiasi
             momento, con o senza preavviso, nei seguenti casi:
@@ -780,7 +780,7 @@ function ApiContent() {
           <ArticleBadge number={12} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Modifiche alle API</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera si riserva il diritto di modificare, aggiornare, deprecare o interrompere
             funzionalità delle API, incluse versioni specifiche, endpoint, parametri o comportamenti.
@@ -812,7 +812,7 @@ function ApiContent() {
           <ArticleBadge number={13} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Proprietà Intellettuale</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Le API Trustera, la relativa documentazione tecnica, gli SDK, gli esempi di codice e
             qualsiasi altro materiale tecnico fornito da Trustera sono protetti da diritti di
@@ -842,7 +842,7 @@ function ApiContent() {
           <ArticleBadge number={14} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Responsabilità</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Trustera non sarà responsabile per danni diretti, indiretti, incidentali o consequenziali
             derivanti dall'uso delle API, da interruzioni del servizio, da errori nelle risposte o
@@ -872,7 +872,7 @@ function ApiContent() {
           <ArticleBadge number={15} />
           <h2 className="text-lg font-bold text-[#0d3d2a]">Legge Applicabile</h2>
         </div>
-        <div className="pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
+        <div className="pl-0 sm:pl-10 space-y-3 text-gray-600 text-[15px] leading-relaxed">
           <p>
             Le presenti Condizioni API sono disciplinate dalla legge italiana. Per qualsiasi
             controversia relativa all'interpretazione, all'applicazione o all'esecuzione delle
@@ -899,7 +899,7 @@ export default function TermsPage() {
 
   return (
     <SiteLayout>
-      <div className="max-w-3xl mx-auto px-6 py-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
 
         {/* Page header */}
         <div className="mb-10">
@@ -915,10 +915,10 @@ export default function TermsPage() {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-10 w-fit">
+        <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-10 w-full sm:w-fit">
           <button
             onClick={() => setActiveTab('termini')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex-1 sm:flex-none px-4 sm:px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'termini'
                 ? 'bg-white text-[#0d3d2a] shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -928,7 +928,7 @@ export default function TermsPage() {
           </button>
           <button
             onClick={() => setActiveTab('api')}
-            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex-1 sm:flex-none px-4 sm:px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === 'api'
                 ? 'bg-white text-[#0d3d2a] shadow-sm'
                 : 'text-gray-500 hover:text-gray-700'
@@ -942,11 +942,11 @@ export default function TermsPage() {
         {activeTab === 'termini' ? <TerminiContent /> : <ApiContent />}
 
         {/* Footer nav */}
-        <div className="mt-16 pt-8 border-t border-gray-200 flex items-center justify-between">
+        <div className="mt-16 pt-8 border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <Link to="/" className="text-green-600 hover:underline text-sm font-medium">
             Torna alla home
           </Link>
-          <span className="text-xs text-gray-400">Trustera — Infrastructure for Digital Trust</span>
+          <span className="text-xs text-gray-400 break-words">Trustera — Infrastructure for Digital Trust</span>
         </div>
       </div>
     </SiteLayout>

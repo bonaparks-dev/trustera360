@@ -1272,14 +1272,14 @@ export default function DashboardPage({ session }: { session: Session }) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex-shrink-0">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <img src="/trustera-logo.jpeg" alt="Trustera" className="h-16 w-auto" />
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500 hidden sm:block">{userName}</span>
+      <header className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+          <img src="/trustera-logo.jpeg" alt="Trustera" className="h-10 sm:h-16 w-auto" />
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <span className="text-sm text-gray-500 hidden sm:block truncate max-w-[200px]">{userName}</span>
             <button
               onClick={handleLogout}
-              className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+              className="text-sm text-gray-500 hover:text-red-600 transition-colors flex-shrink-0"
             >
               Esci
             </button>
@@ -1346,11 +1346,11 @@ export default function DashboardPage({ session }: { session: Session }) {
           {section === 'documenti' && (
             <div>
               {/* Sent / Signed by me tabs + new button */}
-              <div className="flex items-center justify-between mb-4 gap-3">
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+              <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-1 min-w-0">
                   <button
                     onClick={() => setActiveDocTab('sent')}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    className={`px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
                       activeDocTab === 'sent' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -1358,26 +1358,28 @@ export default function DashboardPage({ session }: { session: Session }) {
                   </button>
                   <button
                     onClick={() => setActiveDocTab('signed_by_me')}
-                    className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+                    className={`px-3 sm:px-4 py-2 rounded-md text-xs sm:text-sm font-semibold transition-colors whitespace-nowrap ${
                       activeDocTab === 'signed_by_me' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
-                    Firmati da me ({signedByMeCount})
+                    <span className="sm:hidden">Firmati</span>
+                    <span className="hidden sm:inline">Firmati da me</span> ({signedByMeCount})
                   </button>
                 </div>
                 {activeDocTab === 'sent' && (
                   <button
                     onClick={() => { resetUploadModal(); setShowUploadModal(true) }}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg text-sm transition-colors flex-shrink-0"
+                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 sm:px-5 rounded-lg text-sm transition-colors flex-shrink-0"
                   >
-                    + Nuovo Documento
+                    <span className="sm:hidden">+ Nuovo</span>
+                    <span className="hidden sm:inline">+ Nuovo Documento</span>
                   </button>
                 )}
               </div>
 
               {/* Filter tabs (YouSign-style) */}
               {activeDocTab === 'sent' && (
-                <div className="flex gap-0 border-b border-gray-200 mb-4">
+                <div className="flex gap-0 border-b border-gray-200 mb-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
                   {([
                     { key: 'tutte' as DocFilter, label: 'Tutte', count: totalSent },
                     { key: 'in_corso' as DocFilter, label: 'In corso', count: pendingCount },
@@ -1388,7 +1390,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     <button
                       key={tab.key}
                       onClick={() => setDocFilter(tab.key)}
-                      className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      className={`px-3 sm:px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex-shrink-0 ${
                         docFilter === tab.key
                           ? 'border-green-600 text-green-700'
                           : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -1487,7 +1489,7 @@ export default function DashboardPage({ session }: { session: Session }) {
                     return (
                       <div key={doc.id}>
                         <div
-                          className="flex items-center gap-4 px-5 py-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
+                          className="flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 sm:py-4 hover:bg-gray-50/50 transition-colors cursor-pointer"
                           onClick={() => setExpandedDocIds(prev => {
                             const next = new Set(prev)
                             if (next.has(doc.id)) next.delete(doc.id)
@@ -1531,10 +1533,10 @@ export default function DashboardPage({ session }: { session: Session }) {
                           </div>
 
                           {/* Right: status + actions */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+                            <div className="flex items-center gap-1.5" title={statusLabels[getDocDisplayStatus(doc)] || doc.status}>
                               <span className={`w-2 h-2 rounded-full ${statusColors[getDocDisplayStatus(doc)] || 'bg-gray-400'}`} />
-                              <span className="text-sm font-medium text-gray-600">{statusLabels[getDocDisplayStatus(doc)] || doc.status}</span>
+                              <span className="hidden sm:inline text-sm font-medium text-gray-600">{statusLabels[getDocDisplayStatus(doc)] || doc.status}</span>
                             </div>
                             {doc.signed_pdf_url && (
                               <a

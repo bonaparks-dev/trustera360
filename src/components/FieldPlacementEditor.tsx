@@ -106,6 +106,26 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
   const [tapPlaceType, setTapPlaceType] = useState<FieldType | null>(null)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
   const [pdfError, setPdfError] = useState<string | null>(null)
+  const [pageWidth, setPageWidth] = useState(() => {
+    if (typeof window === 'undefined') return 700
+    const w = window.innerWidth
+    return Math.min(700, w - (w >= 768 ? 280 : 32))
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const update = () => {
+      const w = window.innerWidth
+      setPageWidth(Math.min(700, Math.max(280, w - (w >= 768 ? 280 : 32))))
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [])
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({})
   const [expandedSignerIndex, setExpandedSignerIndex] = useState<number | null>(0)
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
@@ -344,16 +364,17 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
     <div className="fixed inset-0 bg-gray-100 z-50 flex flex-col">
 
       {/* ── Top bar ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between flex-shrink-0 z-20">
-        <button onClick={onCancel} className="text-sm text-gray-500 hover:text-gray-700 font-medium">
+      <div className="bg-white border-b border-gray-200 px-3 sm:px-4 py-3 flex items-center justify-between gap-2 flex-shrink-0 z-20">
+        <button onClick={onCancel} className="text-sm text-gray-500 hover:text-gray-700 font-medium flex-shrink-0">
           Annulla
         </button>
-        <h2 className="text-[15px] font-semibold text-gray-900">Posiziona i campi</h2>
+        <h2 className="hidden sm:block text-[15px] font-semibold text-gray-900 truncate">Posiziona i campi</h2>
         <button
           onClick={handleSubmit}
-          className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors"
+          className="bg-green-600 hover:bg-green-700 text-white text-sm font-semibold px-3 sm:px-5 py-2 rounded-lg transition-colors flex-shrink-0"
         >
-          Invia per Firma ({fields.length})
+          <span className="sm:hidden">Invia ({fields.length})</span>
+          <span className="hidden sm:inline">Invia per Firma ({fields.length})</span>
         </button>
       </div>
 
@@ -512,7 +533,7 @@ export default function FieldPlacementEditor({ pdfUrl, signers, onComplete, onCa
               >
                 <Page
                   pageNumber={pageNum}
-                  width={Math.min(700, window.innerWidth - (window.innerWidth >= 768 ? 280 : 32))}
+                  width={pageWidth}
                   renderTextLayer={false}
                   renderAnnotationLayer={false}
                 />

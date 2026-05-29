@@ -179,16 +179,16 @@ export default function PricingPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Hero                                                                 */}
       {/* ------------------------------------------------------------------ */}
-      <section className="max-w-3xl mx-auto px-6 pt-20 pb-16 text-center">
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-10 sm:pb-16 text-center">
         <p className="text-sm font-semibold uppercase tracking-widest text-green-600 mb-4">
           Pricing
         </p>
-        <h1 className="text-4xl sm:text-5xl font-bold leading-[1.1] text-[#0d3d2a] mb-5">
+        <h1 className="text-3xl sm:text-5xl font-bold leading-[1.1] text-[#0d3d2a] mb-5">
           Prezzi trasparenti.
           <br />
           Nessun costo nascosto.
         </h1>
-        <p className="text-lg sm:text-xl text-gray-500 leading-relaxed max-w-2xl mx-auto">
+        <p className="text-base sm:text-xl text-gray-500 leading-relaxed max-w-2xl mx-auto">
           Crediamo che la chiarezza sia un valore. Ogni piano indica esattamente
           cosa ottieni, quanto paghi e cosa non ti verra mai addebitato a
           sorpresa.
@@ -198,7 +198,7 @@ export default function PricingPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Section 1 — Piani Piattaforma                                        */}
       {/* ------------------------------------------------------------------ */}
-      <section className="max-w-5xl mx-auto px-6 pb-20">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 pb-12 sm:pb-20">
         <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#0d3d2a] mb-3">
           Piani Piattaforma
         </h2>
@@ -214,7 +214,7 @@ export default function PricingPage() {
         {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 items-stretch">
           {/* Free card */}
-          <div className="flex flex-col bg-white border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md hover:shadow-green-600/5 transition-shadow">
+          <div className="flex flex-col bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm hover:shadow-md hover:shadow-green-600/5 transition-shadow">
             <div className="mb-6">
               <h3 className="text-xl font-bold text-gray-900 mb-1">Free</h3>
               <div className="flex items-end gap-1.5 mt-3">
@@ -245,7 +245,7 @@ export default function PricingPage() {
           </div>
 
           {/* Premium card */}
-          <div className="flex flex-col bg-white border-2 border-green-500/30 rounded-2xl p-8 relative shadow-sm hover:shadow-md hover:shadow-green-600/5 transition-shadow">
+          <div className="flex flex-col bg-white border-2 border-green-500/30 rounded-2xl p-6 sm:p-8 relative shadow-sm hover:shadow-md hover:shadow-green-600/5 transition-shadow">
             {/* PRO badge */}
             <div className="absolute -top-3.5 right-6">
               <span className="inline-flex items-center rounded-full bg-green-600 px-3 py-1 text-xs font-bold text-white shadow-sm shadow-green-600/40">
@@ -288,7 +288,7 @@ export default function PricingPage() {
       {/* Section 2 — Piani API                                               */}
       {/* ------------------------------------------------------------------ */}
       <section className="bg-gray-50 border-y border-gray-100">
-        <div className="max-w-5xl mx-auto px-6 py-16">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="max-w-xl">
               <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-3">
@@ -305,7 +305,7 @@ export default function PricingPage() {
             </div>
             <a
               href="mailto:info@trustera.it"
-              className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-green-600 px-6 py-3.5 text-sm font-bold text-green-700 hover:bg-green-50 transition-colors"
+              className="inline-flex w-full sm:w-auto justify-center shrink-0 items-center gap-2 rounded-xl border border-green-600 px-6 py-3.5 text-sm font-bold text-green-700 hover:bg-green-50 transition-colors"
             >
               Contattaci
               <svg
@@ -330,8 +330,8 @@ export default function PricingPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Section 3 — Marketing block "30 giorni gratis"                      */}
       {/* ------------------------------------------------------------------ */}
-      <section className="max-w-5xl mx-auto px-6 py-20">
-        <div className="bg-[#0d3d2a] rounded-3xl px-8 py-12 md:px-14 md:py-14 overflow-hidden relative">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+        <div className="bg-[#0d3d2a] rounded-3xl px-6 py-10 sm:px-8 sm:py-12 md:px-14 md:py-14 overflow-hidden relative">
           {/* Decorative circle */}
           <div
             className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-10"
@@ -358,7 +358,7 @@ export default function PricingPage() {
               </p>
               <Link
                 to="/login"
-                className="mt-8 inline-block bg-white text-green-700 font-bold px-7 py-3.5 rounded-xl text-sm hover:bg-green-50 transition-colors shadow-lg"
+                className="mt-8 inline-block w-full sm:w-auto text-center bg-white text-green-700 font-bold px-7 py-3.5 rounded-xl text-sm hover:bg-green-50 transition-colors shadow-lg"
               >
                 Inizia Gratis
               </Link>
@@ -391,21 +391,21 @@ export default function PricingPage() {
       {/* ------------------------------------------------------------------ */}
       {/* Section 4 — FAQ                                                     */}
       {/* ------------------------------------------------------------------ */}
-      <section className="max-w-2xl mx-auto px-6 pb-24">
+      <section className="max-w-2xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
         <h2 className="text-2xl sm:text-3xl font-bold text-center text-[#0d3d2a] mb-2">
           Domande frequenti
         </h2>
-        <p className="text-center text-gray-400 text-sm mb-10">
+        <p className="text-center text-gray-400 text-sm mb-10 break-words">
           Non trovi la risposta? Scrivici a{' '}
           <a
             href="mailto:info@trustera.it"
-            className="text-green-600 hover:underline"
+            className="text-green-600 hover:underline break-all"
           >
             info@trustera.it
           </a>
         </p>
 
-        <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white px-6 shadow-sm">
+        <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white px-4 sm:px-6 shadow-sm">
           {FAQS.map((faq, index) => (
             <FaqItem
               key={faq.question}
@@ -421,7 +421,7 @@ export default function PricingPage() {
       {/* Bottom CTA                                                           */}
       {/* ------------------------------------------------------------------ */}
       <section className="border-t border-gray-100 bg-gray-50">
-        <div className="max-w-2xl mx-auto px-6 py-16 text-center">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-16 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-[#0d3d2a] mb-3">
             Pronto a iniziare?
           </h2>
@@ -431,7 +431,7 @@ export default function PricingPage() {
           </p>
           <Link
             to="/login"
-            className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold px-10 py-4 rounded-xl text-sm transition-colors shadow-lg shadow-green-600/25"
+            className="inline-block w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold px-10 py-4 rounded-xl text-sm transition-colors shadow-lg shadow-green-600/25"
           >
             Inizia Gratis
           </Link>

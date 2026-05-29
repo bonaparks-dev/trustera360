@@ -165,10 +165,17 @@ export const handler: Handler = async (event) => {
 
         // ── Determine signer position (needed for seal placement + footer offset) ──
         let signerIndex = 0
+        // 2026-05-29: signerRole — quando un booking DR7 ha fideiussori
+        // solidali (booking_details.guarantors[]), il signer corrente puo'
+        // essere fideiussore_1/2/3 invece di customer / 2° guidatore.
+        // Posizioniamo il seal sotto nel riquadro "Firma del garante" in
+        // colonne (1=sx, 2=centro, 3=dx) invece di farlo cadere nel box
+        // "2° guidatore" del template.
+        let signerRole: 'locatore' | '1_guidatore' | '2_guidatore' | 'fideiussore_1' | 'fideiussore_2' | 'fideiussore_3' | 'garante' = '1_guidatore'
         if (sigRequest.contract_id) {
             const { data: allRequests } = await supabase
                 .from('signature_requests')
-                .select('id, created_at')
+                .select('id, created_at, signer_name, signer_email, signer_phone')
                 .eq('contract_id', sigRequest.contract_id)
                 .in('status', ['signed', 'otp_verified', 'otp_sent', 'pending'])
                 .order('created_at', { ascending: true })
@@ -177,6 +184,74 @@ export const handler: Handler = async (event) => {
                 if (signerIndex < 0) signerIndex = 0
             }
             console.log(`[signature-complete] Signer index: ${signerIndex} of ${allRequests?.length || 1}`)
+
+            // ── Role detection via booking_details ────────────────────
+            // Carichiamo il booking attraverso il contract per matchare il
+            // signer corrente con uno dei "ruoli" possibili. Se il match e'
+            // ambiguo o non trovato, fallback al comportamento by-index.
+            try {
+                const { data: ctx } = await supabase
+                    .from('contracts')
+                    .select('booking_id')
+                    .eq('id', sigRequest.contract_id)
+                    .maybeSingle()
+                if (ctx?.booking_id) {
+                    const { data: bk } = await supabase
+                        .from('bookings')
+                        .select('customer_email, customer_phone, customer_name, booking_details')
+                        .eq('id', ctx.booking_id)
+                        .maybeSingle()
+                    const normPhone = (s: any) => String(s || '').replace(/[\s\+\-\(\)]/g, '').replace(/^00/, '').toLowerCase()
+                    const normEmail = (s: any) => String(s || '').trim().toLowerCase()
+                    const sigEmail = normEmail(sigRequest.signer_email)
+                    const sigPhone = normPhone(sigRequest.signer_phone)
+                    // 1° guidatore = booking customer
+                    const custEmail = normEmail(bk?.customer_email || bk?.booking_details?.customer?.email)
+                    const custPhone = normPhone(bk?.customer_phone || bk?.booking_details?.customer?.phone)
+                    if ((sigEmail && sigEmail === custEmail) || (sigPhone && sigPhone === custPhone)) {
+                        signerRole = '1_guidatore'
+                    } else {
+                        // 2° guidatore
+                        const sd = bk?.booking_details?.second_driver
+                        const sdEmail = normEmail(sd?.email)
+                        const sdPhone = normPhone(sd?.phone)
+                        if ((sigEmail && sigEmail === sdEmail) || (sigPhone && sigPhone === sdPhone)) {
+                            signerRole = '2_guidatore'
+                        } else {
+                            // garante veicolo (cauzione_auto)
+                            const gv = bk?.booking_details?.garante_veicolo
+                            const gvEmail = normEmail(gv?.email)
+                            const gvPhone = normPhone(gv?.telefono || gv?.phone)
+                            if ((sigEmail && sigEmail === gvEmail) || (sigPhone && sigPhone === gvPhone)) {
+                                signerRole = 'garante'
+                            } else {
+                                // Fideiussori solidali (1/2/3)
+                                const fids: any[] = Array.isArray(bk?.booking_details?.guarantors)
+                                    ? bk.booking_details.guarantors
+                                    : []
+                                let matchedN: 1 | 2 | 3 | null = null
+                                for (const row of fids) {
+                                    const n = Number(row?.index)
+                                    if (n !== 1 && n !== 2 && n !== 3) continue
+                                    const fEmail = normEmail(row[`garante_${n}_email`])
+                                    const fPhone = normPhone(row[`garante_${n}_telefono`])
+                                    if ((sigEmail && sigEmail === fEmail) || (sigPhone && sigPhone === fPhone)) {
+                                        matchedN = n as 1 | 2 | 3
+                                        break
+                                    }
+                                }
+                                if (matchedN) {
+                                    signerRole = `fideiussore_${matchedN}` as typeof signerRole
+                                }
+                                // else: stays as '1_guidatore' fallback
+                            }
+                        }
+                    }
+                    console.log(`[signature-complete] Role detected: ${signerRole} for ${sigRequest.signer_name}`)
+                }
+            } catch (roleErr: any) {
+                console.warn('[signature-complete] Role detection failed (fallback to index-based):', roleErr?.message)
+            }
         }
 
         // ── Trustera Verified Seals with QR code on last page ──
@@ -259,19 +334,35 @@ export const handler: Handler = async (event) => {
                 console.log('[signature-complete] FIRMA LOCATORE seal placed')
             }
 
-            // ── Guidatore / Garante seal positions ──
+            // ── Guidatore / Garante / Fideiussore seal positions ──
             // From screenshot: LOCATORE col wider (~30-248), 1° guid (~248-438), 2° guid (~438-567)
+            // Row 2 (garante full-width) ~30-105 split in 3 columns for fideiussori.
+            // 2026-05-29: ora usiamo signerRole invece di signerIndex cosi'
+            // i fideiussori vanno nella riga garante (non nel box "2° guidatore").
             let sealX: number
             let sealYPos: number
-            if (signerIndex === 0) {
-                sealX = 230   // 1° guidatore column
-                sealYPos = 135 // Inside box, below header text
-            } else if (signerIndex === 1) {
-                sealX = 437   // Center of 2° guidatore: (438+567)/2 - 65
-                sealYPos = 135 // Inside box, below header text
+            if (signerRole === '1_guidatore') {
+                sealX = 230
+                sealYPos = 135
+            } else if (signerRole === '2_guidatore') {
+                sealX = 437
+                sealYPos = 135
+            } else if (signerRole === 'fideiussore_1') {
+                // Left column of garante row
+                sealX = 50
+                sealYPos = 35
+            } else if (signerRole === 'fideiussore_2') {
+                // Center column of garante row
+                sealX = (pageWidth - sealW) / 2
+                sealYPos = 35
+            } else if (signerRole === 'fideiussore_3') {
+                // Right column of garante row
+                sealX = pageWidth - sealW - 50
+                sealYPos = 35
             } else {
-                sealX = (pageWidth - sealW) / 2  // Centered for garante
-                sealYPos = 35  // Inside garante row
+                // 'garante' (cauzione_auto, single legacy garante) or unknown -> centered
+                sealX = (pageWidth - sealW) / 2
+                sealYPos = 35
             }
 
             // Outer rectangle

@@ -99,7 +99,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 
 function SectionDescription({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mt-4 text-lg text-gray-500 leading-relaxed max-w-2xl">
+    <p className="mt-4 text-base sm:text-lg text-gray-500 leading-relaxed max-w-2xl">
       {children}
     </p>
   )
@@ -141,33 +141,33 @@ export default function ApiPage() {
           aria-hidden="true"
         />
 
-        <div className="relative max-w-6xl mx-auto px-6 py-24 sm:py-32">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 py-16 sm:py-32">
           <div className="max-w-3xl">
             <span className="inline-flex items-center gap-2 bg-green-600/20 border border-green-500/30 text-green-300 text-xs font-semibold px-3 py-1.5 rounded-full mb-6 tracking-wider uppercase">
               <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
               Trustera API
             </span>
 
-            <h1 className="text-5xl sm:text-6xl font-extrabold leading-tight tracking-tight mb-6">
+            <h1 className="text-4xl sm:text-6xl font-extrabold leading-tight tracking-tight mb-6">
               Trustera API
             </h1>
 
-            <p className="text-xl text-green-100/80 leading-relaxed mb-10 max-w-2xl">
+            <p className="text-lg sm:text-xl text-green-100/80 leading-relaxed mb-10 max-w-2xl">
               Le API Trustera consentono di integrare facilmente la firma
               digitale e la gestione dei documenti all&apos;interno di software,
               applicazioni e piattaforme aziendali.
             </p>
 
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4">
               <Link
                 to="/login"
-                className="bg-green-500 hover:bg-green-400 text-white font-bold px-7 py-3.5 rounded-xl transition-colors shadow-lg shadow-green-900/30 text-sm"
+                className="w-full sm:w-auto text-center bg-green-500 hover:bg-green-400 text-white font-bold px-7 py-3.5 rounded-xl transition-colors shadow-lg shadow-green-900/30 text-sm"
               >
                 Inizia Gratis
               </Link>
               <Link
                 to="/terms"
-                className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-7 py-3.5 rounded-xl transition-colors text-sm"
+                className="w-full sm:w-auto text-center bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-7 py-3.5 rounded-xl transition-colors text-sm"
               >
                 Leggi la documentazione
               </Link>
@@ -177,17 +177,17 @@ export default function ApiPage() {
       </section>
 
       {/* ── Code snippet ── */}
-      <section className="bg-gray-950 py-12 px-6">
+      <section className="bg-gray-950 py-10 sm:py-12 px-4 sm:px-6">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center gap-2 mb-4">
             <span className="w-3 h-3 rounded-full bg-red-500" />
             <span className="w-3 h-3 rounded-full bg-yellow-500" />
             <span className="w-3 h-3 rounded-full bg-green-500" />
-            <span className="ml-3 text-xs text-gray-400 font-mono">
+            <span className="ml-3 text-xs text-gray-400 font-mono truncate">
               POST /api/v1/documents/sign
             </span>
           </div>
-          <pre className="bg-gray-900 border border-gray-800 rounded-2xl p-6 overflow-x-auto text-[13px] leading-relaxed font-mono text-gray-100 shadow-2xl">
+          <pre className="bg-gray-900 border border-gray-800 rounded-2xl p-4 sm:p-6 overflow-x-auto text-[12px] sm:text-[13px] leading-relaxed font-mono text-gray-100 shadow-2xl">
             <code>
               {codeExample.split('\n').map((line, i) => {
                 if (line.startsWith('POST')) {
@@ -258,9 +258,9 @@ export default function ApiPage() {
       </section>
 
       {/* ── 1. Integrazione semplice ── */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div>
               <SectionLabel>Integrazione semplice</SectionLabel>
               <SectionHeading>
@@ -274,7 +274,7 @@ export default function ApiPage() {
               </SectionDescription>
             </div>
 
-            <ul className="grid sm:grid-cols-2 gap-4">
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {integrationCapabilities.map((cap) => (
                 <li
                   key={cap}
@@ -292,14 +292,14 @@ export default function ApiPage() {
       </section>
 
       {/* ── 2. Embedded signing ── */}
-      <section className="py-24 px-6 bg-gray-50">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             {/* visual placeholder */}
-            <div className="order-2 lg:order-1 bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <div className="order-2 lg:order-1 bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-2.5 h-2.5 rounded-full bg-green-400" />
-                <span className="text-xs text-gray-400 font-mono">
+                <span className="text-xs text-gray-400 font-mono break-all">
                   embedded-signing-iframe
                 </span>
               </div>
@@ -321,8 +321,8 @@ export default function ApiPage() {
                   Firma integrata nella tua piattaforma
                 </p>
               </div>
-              <div className="mt-6 flex items-center justify-between">
-                <span className="text-xs text-gray-400">
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-gray-400 break-all">
                   mario@example.com
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-full border border-green-100">
@@ -362,9 +362,9 @@ export default function ApiPage() {
       </section>
 
       {/* ── 3. Webhook e automazioni ── */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-16">
             <SectionLabel>Webhook e automazioni</SectionLabel>
             <SectionHeading>
               Reagisci agli eventi in tempo reale
@@ -378,7 +378,7 @@ export default function ApiPage() {
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {webhookEvents.map(({ event, label }) => (
               <div
                 key={event}
@@ -390,7 +390,7 @@ export default function ApiPage() {
                     webhook
                   </span>
                 </div>
-                <p className="font-mono text-sm text-sky-300 mb-1">{event}</p>
+                <p className="font-mono text-sm text-sky-300 mb-1 break-all">{event}</p>
                 <p className="text-sm text-gray-400">{label}</p>
               </div>
             ))}
@@ -407,9 +407,9 @@ export default function ApiPage() {
       </section>
 
       {/* ── 4. Template e gestione documenti ── */}
-      <section className="py-24 px-6 bg-gray-50">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-gray-50">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div>
               <SectionLabel>Template e gestione documenti</SectionLabel>
               <SectionHeading>
@@ -479,11 +479,11 @@ export default function ApiPage() {
       </section>
 
       {/* ── 5 & 6. Sicurezza + Sandbox ── */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {/* Sicurezza */}
-            <div className="bg-gray-950 rounded-2xl p-8 text-white">
+            <div className="bg-gray-950 rounded-2xl p-6 sm:p-8 text-white">
               <div className="w-10 h-10 bg-green-600/20 border border-green-500/30 rounded-xl flex items-center justify-center mb-6">
                 <svg
                   className="w-5 h-5 text-green-400"
@@ -530,7 +530,7 @@ export default function ApiPage() {
             </div>
 
             {/* Sandbox */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
+            <div className="bg-white border border-gray-100 rounded-2xl p-6 sm:p-8 shadow-sm">
               <div className="w-10 h-10 bg-green-50 border border-green-100 rounded-xl flex items-center justify-center mb-6">
                 <svg
                   className="w-5 h-5 text-green-600"
@@ -571,7 +571,7 @@ export default function ApiPage() {
       </section>
 
       {/* ── 7. Piani API ── */}
-      <section className="py-24 px-6 bg-gray-50">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-gray-50">
         <div className="max-w-4xl mx-auto text-center">
           <SectionLabel>Piani API</SectionLabel>
           <SectionHeading>Accesso API su misura</SectionHeading>
@@ -583,11 +583,11 @@ export default function ApiPage() {
           </div>
 
           <div className="mt-12 bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden">
-            <div className="bg-[#0d3d2a] px-8 py-10 text-white text-left">
+            <div className="bg-[#0d3d2a] px-6 sm:px-8 py-8 sm:py-10 text-white text-left">
               <p className="text-xs font-semibold text-green-400 uppercase tracking-widest mb-2">
                 Piano API
               </p>
-              <h3 className="text-3xl font-bold mb-1">
+              <h3 className="text-2xl sm:text-3xl font-bold mb-1">
                 Tutto incluso
               </h3>
               <p className="text-green-100/70 text-sm">
@@ -595,7 +595,7 @@ export default function ApiPage() {
               </p>
             </div>
 
-            <ul className="px-8 py-8 grid sm:grid-cols-2 gap-x-10 gap-y-4 text-left">
+            <ul className="px-6 sm:px-8 py-6 sm:py-8 grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-4 text-left">
               {planFeatures.map((f) => (
                 <li key={f} className="flex items-start gap-3">
                   <CheckIcon />
@@ -604,7 +604,7 @@ export default function ApiPage() {
               ))}
             </ul>
 
-            <div className="px-8 pb-8 flex flex-col sm:flex-row gap-4">
+            <div className="px-6 sm:px-8 pb-6 sm:pb-8 flex flex-col sm:flex-row gap-4">
               <Link
                 to="/login"
                 className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl transition-colors text-sm shadow-md shadow-green-600/20"
@@ -620,11 +620,11 @@ export default function ApiPage() {
             </div>
           </div>
 
-          <p className="mt-6 text-xs text-gray-400">
+          <p className="mt-6 text-xs text-gray-400 break-words">
             Hai esigenze di volume elevate?{' '}
             <a
               href="mailto:info@trustera.it"
-              className="text-green-600 hover:underline font-medium"
+              className="text-green-600 hover:underline font-medium break-all"
             >
               Contattaci per un piano custom
             </a>
@@ -633,9 +633,9 @@ export default function ApiPage() {
       </section>
 
       {/* ── 8. Documentazione ── */}
-      <section className="py-24 px-6 bg-white">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div>
               <SectionLabel>Documentazione</SectionLabel>
               <SectionHeading>
@@ -650,7 +650,7 @@ export default function ApiPage() {
               <div className="mt-8 flex flex-wrap gap-4">
                 <Link
                   to="/terms"
-                  className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm shadow-md shadow-green-600/20"
+                  className="inline-flex w-full sm:w-auto justify-center items-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl transition-colors text-sm shadow-md shadow-green-600/20"
                 >
                   Leggi la documentazione
                   <svg
@@ -703,9 +703,9 @@ export default function ApiPage() {
       </section>
 
       {/* ── Feature cards row ── */}
-      <section className="py-16 px-6 bg-gray-50 border-t border-gray-100">
+      <section className="py-10 sm:py-16 px-4 sm:px-6 bg-gray-50 border-t border-gray-100">
         <div className="max-w-6xl mx-auto">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             <FeatureCard
               icon={
                 <svg
@@ -768,25 +768,25 @@ export default function ApiPage() {
       </section>
 
       {/* ── CTA finale ── */}
-      <section className="py-24 px-6 bg-[#0d3d2a] text-white">
+      <section className="py-12 sm:py-24 px-4 sm:px-6 bg-[#0d3d2a] text-white">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl sm:text-5xl font-extrabold mb-5 leading-tight">
+          <h2 className="text-3xl sm:text-5xl font-extrabold mb-5 leading-tight">
             Pronto a integrare?
           </h2>
-          <p className="text-green-100/70 text-lg mb-10 max-w-xl mx-auto leading-relaxed">
+          <p className="text-green-100/70 text-base sm:text-lg mb-10 max-w-xl mx-auto leading-relaxed">
             Crea un account gratuito, ottieni la tua API key e invia il primo
             documento in firma in meno di dieci minuti.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               to="/login"
-              className="bg-green-500 hover:bg-green-400 text-white font-bold px-8 py-4 rounded-xl transition-colors shadow-lg shadow-green-900/30 text-sm"
+              className="w-full sm:w-auto text-center bg-green-500 hover:bg-green-400 text-white font-bold px-8 py-4 rounded-xl transition-colors shadow-lg shadow-green-900/30 text-sm"
             >
               Inizia Gratis
             </Link>
             <Link
               to="/terms"
-              className="bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl transition-colors text-sm"
+              className="w-full sm:w-auto text-center bg-white/10 hover:bg-white/20 border border-white/20 text-white font-semibold px-8 py-4 rounded-xl transition-colors text-sm"
             >
               Leggi la documentazione
             </Link>

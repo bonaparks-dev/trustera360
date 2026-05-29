@@ -41,8 +41,26 @@ export default function SignPage() {
   const [numPages, setNumPages] = useState(0)
   const [pdfReady, setPdfReady] = useState(false)
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const pdfContainerRef = useRef<HTMLDivElement | null>(null)
+  const [pdfWidth, setPdfWidth] = useState(() => Math.min(650, (typeof window !== 'undefined' ? window.innerWidth : 650) - 32))
 
   const hasFields = fields.length > 0
+
+  // Track container width so the PDF re-renders on rotate / window resize
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const update = () => {
+      const containerW = pdfContainerRef.current?.clientWidth ?? (window.innerWidth - 32)
+      setPdfWidth(Math.min(650, Math.max(280, containerW)))
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [pdfReady, numPages])
 
   // Fetch PDF as blob to avoid CORS issues with Supabase signed URLs
   useEffect(() => {
@@ -370,21 +388,21 @@ export default function SignPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 py-4 px-6 flex items-center justify-between">
-        <img src="/trustera-logo.jpeg" alt="Trustera" className="h-12 w-auto" />
-        <span className="text-sm text-gray-400">Firma Elettronica</span>
+      <div className="bg-white border-b border-gray-200 py-3 px-4 sm:py-4 sm:px-6 flex items-center justify-between gap-3">
+        <img src="/trustera-logo.jpeg" alt="Trustera" className="h-9 sm:h-12 w-auto" />
+        <span className="text-xs sm:text-sm text-gray-400 whitespace-nowrap">Firma Elettronica</span>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 sm:p-6">
+      <div className="max-w-2xl mx-auto p-3 sm:p-6">
         {/* Document info */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-          <h1 className="text-xl font-bold text-gray-800 mb-1">{documentName || 'Documento'}</h1>
-          <p className="text-sm text-gray-500">Firmatario: {signerName}</p>
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+          <h1 className="text-lg sm:text-xl font-bold text-gray-800 mb-1 break-words">{documentName || 'Documento'}</h1>
+          <p className="text-sm text-gray-500 break-words">Firmatario: {signerName}</p>
         </div>
 
         {/* PDF viewer — react-pdf with field overlays */}
         {pdfUrl && status !== 'signed' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div ref={pdfContainerRef} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-4 sm:mb-6">
             <Document
               file={pdfBlobUrl || pdfUrl}
               onLoadSuccess={({ numPages: n }) => { setNumPages(n); setPdfReady(true) }}
@@ -399,7 +417,7 @@ export default function SignPage() {
                 <div key={pageNum} className="relative w-full">
                   <Page
                     pageNumber={pageNum}
-                    width={Math.min(650, window.innerWidth - 48)}
+                    width={pdfWidth}
                     renderTextLayer={false}
                     renderAnnotationLayer={false}
                   />
@@ -484,7 +502,7 @@ export default function SignPage() {
             <p className="text-gray-600 text-sm mb-6 text-center">
               {otpChannel === 'whatsapp' ? 'Codice inviato via WhatsApp.' : 'Codice inviato via email.'}
             </p>
-            <div className="flex justify-center gap-2 mb-6" onPaste={handleOtpPaste}>
+            <div className="flex justify-center gap-1.5 sm:gap-2 mb-6" onPaste={handleOtpPaste}>
               {otp.map((digit, i) => (
                 <input
                   key={i}
@@ -495,7 +513,7 @@ export default function SignPage() {
                   value={digit}
                   onChange={e => handleOtpChange(i, e.target.value)}
                   onKeyDown={e => handleOtpKeyDown(i, e)}
-                  className="w-12 h-14 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
+                  className="w-10 h-12 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-bold border-2 border-gray-300 rounded-lg focus:border-green-500 focus:outline-none"
                   disabled={status === 'otp_verifying'}
                 />
               ))}
@@ -556,9 +574,9 @@ export default function SignPage() {
 
         {/* Step 4: Signed */}
         {status === 'signed' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
-            <h2 className="text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
-            <p className="text-gray-600 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 sm:p-6 text-center">
+            <h2 className="text-xl sm:text-2xl font-bold text-green-700 mb-2">Documento Firmato</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">
               {signedAt
                 ? `Firmato il ${new Date(signedAt).toLocaleString('it-IT', { timeZone: 'Europe/Rome' })}`
                 : 'Firma completata.'
@@ -569,23 +587,22 @@ export default function SignPage() {
                 href={signedPdfUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-block bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg transition-colors"
+                className="block sm:inline-block w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 sm:px-8 rounded-lg transition-colors"
               >
                 Scarica Documento Firmato
               </a>
             )}
-            <p className="text-xs text-gray-400 mt-6">
-              Firma documenti in pochi secondi —{' '}
-              <a href="https://trustera360.app" className="text-green-600 hover:underline">
-                www.trustera360.app
-              </a>{' '}
-              — tutto gratuito.
+            <p className="text-xs text-gray-400 mt-6 leading-relaxed">
+              Firma gratuita in pochi secondi su{' '}
+              <a href="https://trustera360.app" className="text-green-600 hover:underline break-all">
+                trustera360.app
+              </a>
             </p>
           </div>
         )}
       </div>
 
-      <div className="text-center py-6 text-xs text-gray-400">
+      <div className="text-center py-6 px-4 text-xs text-gray-400">
         Trustera - Infrastructure for Digital Trust
       </div>
     </div>

@@ -335,10 +335,20 @@ export const handler: Handler = async (event) => {
             }
 
             // ── Guidatore / Garante / Fideiussore seal positions ──
-            // From screenshot: LOCATORE col wider (~30-248), 1° guid (~248-438), 2° guid (~438-567)
-            // Row 2 (garante full-width) ~30-105 split in 3 columns for fideiussori.
-            // 2026-05-29: ora usiamo signerRole invece di signerIndex cosi'
-            // i fideiussori vanno nella riga garante (non nel box "2° guidatore").
+            // Layout PDF master DR7:
+            //   Row 1 top (y≈105–235): LOCATORE (col 30–248, seal x=40) |
+            //                          1° guidatore (col 248–438, seal x=230) |
+            //                          2° guidatore (col 438–567, seal x=437)
+            //   Row 2 bottom (y≈30–105): "Firma del garante o Firma, timbro aziendale"
+            //                            in 3 colonne EQUIVALENTI alla riga top
+            //                            (direzione redesigna il PDF in modo
+            //                            speculare): fideiussore_1 → col sx,
+            //                            fideiussore_2 → col centro, fideiussore_3
+            //                            → col dx. Stesse X cosi' i seal sono
+            //                            allineati verticalmente top↔bottom.
+            // 2026-05-29: usiamo signerRole (non signerIndex) per evitare che
+            // un fideiussore cada nel box "2° guidatore" quando il booking
+            // non ha secondo guidatore reale.
             let sealX: number
             let sealYPos: number
             if (signerRole === '1_guidatore') {
@@ -348,19 +358,17 @@ export const handler: Handler = async (event) => {
                 sealX = 437
                 sealYPos = 135
             } else if (signerRole === 'fideiussore_1') {
-                // Left column of garante row
-                sealX = 50
+                sealX = 40            // colonna sinistra (allineata a LOCATORE top)
                 sealYPos = 35
             } else if (signerRole === 'fideiussore_2') {
-                // Center column of garante row
-                sealX = (pageWidth - sealW) / 2
+                sealX = 230           // colonna centro (allineata a 1° guidatore top)
                 sealYPos = 35
             } else if (signerRole === 'fideiussore_3') {
-                // Right column of garante row
-                sealX = pageWidth - sealW - 50
+                sealX = 437           // colonna destra (allineata a 2° guidatore top)
                 sealYPos = 35
             } else {
-                // 'garante' (cauzione_auto, single legacy garante) or unknown -> centered
+                // 'garante' (cauzione_auto, single legacy garante) o unknown
+                // -> centro della riga (compatibilita' indietro).
                 sealX = (pageWidth - sealW) / 2
                 sealYPos = 35
             }

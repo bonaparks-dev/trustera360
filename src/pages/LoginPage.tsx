@@ -84,11 +84,13 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex justify-center mb-8">
           <Link to="/">
-            <img
-              src="/dr7trust-logo.png"
-              alt="DR7 Trust"
-              className="h-14 w-auto"
-            />
+            <span className="inline-flex items-center rounded-xl bg-black px-4 py-2.5">
+              <img
+                src="/dr7trust-logo.png"
+                alt="DR7 Trust"
+                className="h-9 w-auto"
+              />
+            </span>
           </Link>
         </div>
 

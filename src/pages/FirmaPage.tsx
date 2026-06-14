@@ -246,7 +246,7 @@ export default function FirmaPage() {
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <div className="bg-white py-3 px-4 sm:py-4 sm:px-6 flex items-center justify-between gap-3 shadow-sm border-b border-gray-200">
-                <img src="/dr7trust-icon.png" alt="DR7 Trust" className="h-8 sm:h-10" />
+                <img src="/dr7trust-logo.png" alt="DR7 Trust" className="h-6 sm:h-7 w-auto" />
                 <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">Firma Elettronica</span>
             </div>
 
